@@ -1,306 +1,288 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 640" width="100%" height="100%" style="background-color: #0e0f11; font-family: 'JetBrains Mono', 'Fira Code', monospace;">
-  <!-- GRID UNDERLAY -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 780" width="100%" height="100%" style="background-color:#0e0f11;font-family:'JetBrains Mono','Fira Code',monospace;">
+  <!--
+    DEAD BELL — TOP-DOWN MAP OVERVIEW
+    Regenerated to match src/components/GameCanvas.tsx geometry exactly.
+
+    World -> pixel mapping (top-down, +Z = south/down, +X = east/right):
+      x_px = 90 + (X + 14) * 13
+      y_px = 390 + Z * 11
+    So: X=-14 -> 90 ; X=14 -> 454 ; X=22 -> 558 ; X=38 -> 766
+        Z=-25 -> 115 ; Z=0 -> 390 ; Z=25 -> 665
+  -->
   <defs>
-    <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
-      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#1c1e24" stroke-width="1"/>
+    <pattern id="grid" width="26" height="26" patternUnits="userSpaceOnUse">
+      <path d="M 26 0 L 0 0 0 26" fill="none" stroke="#1c1e24" stroke-width="1"/>
     </pattern>
-    <pattern id="dot-grid" width="15" height="15" patternUnits="userSpaceOnUse">
+    <pattern id="dot-grid" width="13" height="13" patternUnits="userSpaceOnUse">
       <circle cx="2" cy="2" r="1" fill="#2d3139"/>
     </pattern>
     <linearGradient id="wall-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1f242e" />
-      <stop offset="100%" stop-color="#11141a" />
+      <stop offset="0%" stop-color="#1f242e"/>
+      <stop offset="100%" stop-color="#11141a"/>
     </linearGradient>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#00ffcc"/>
+    </marker>
   </defs>
 
-  <!-- BACKGROUNDS -->
-  <rect width="100%" height="100%" fill="#0a0b0d" />
-  <rect width="100%" height="100%" fill="url(#dot-grid)" opacity="0.7"/>
+  <!-- BACKGROUND -->
+  <rect width="100%" height="100%" fill="#0a0b0d"/>
+  <rect width="100%" height="100%" fill="url(#dot-grid)" opacity="0.6"/>
   <rect width="100%" height="100%" fill="url(#grid)" opacity="0.3"/>
 
-  <!-- TITLE BLOCK (HUD STYLE) -->
-  <g transform="translate(30, 40)">
-    <line x1="0" y1="0" x2="350" y2="0" stroke="#00f0ff" stroke-width="2" />
-    <line x1="350" y1="0" x2="370" y2="20" stroke="#00f0ff" stroke-width="2" />
-    <text x="0" y="-12" fill="#00f0ff" font-size="12" font-weight="bold" letter-spacing="1.5">DEAD BELL MAP BLUEPRINT</text>
-    <text x="0" y="24" fill="#ffffff" font-size="20" font-weight="900" letter-spacing="1">SURVIVAL ARENA LEVEL: CLASSROOM 101B</text>
-    <text x="0" y="44" fill="#a3a3a3" font-size="11" letter-spacing="0.5">SCALE: 1 UNIT = 15PX — ORIENTATION: TOP-DOWN TACTICAL</text>
+  <!-- TITLE -->
+  <g transform="translate(34,46)">
+    <line x1="0" y1="0" x2="360" y2="0" stroke="#00f0ff" stroke-width="2"/>
+    <line x1="360" y1="0" x2="380" y2="20" stroke="#00f0ff" stroke-width="2"/>
+    <text x="0" y="-12" fill="#00f0ff" font-size="12" font-weight="bold" letter-spacing="1.5">DEAD BELL — MAP BLUEPRINT</text>
+    <text x="0" y="24" fill="#ffffff" font-size="20" font-weight="900" letter-spacing="1">SURVIVAL ARENA: ST. KNELL ACADEMY</text>
+    <text x="0" y="44" fill="#a3a3a3" font-size="11">TOP-DOWN TACTICAL — 1 UNIT = 13PX — N IS UP (-Z)</text>
   </g>
 
-  <!-- ARENA BOUNDS DESIGN & LAYOUT -->
-  <!-- 
-    Coordinate mapping:
-    (X, Z) -> (x_pixel, y_pixel)
-    Using scaling center at (280, 315) with factor 15.
-    x_pixel = 280 + X * 15
-    y_pixel = 315 + Z * 15
-  -->
-
-  <!-- SECTOR AREAS OUTLINES (UNDERLAY COVERS) -->
-  <!-- Classroom Bounds: x_pixel 70 to 490, y_pixel 135 to 495 -->
-  <rect x="70" y="135" width="420" height="360" fill="#14171d" opacity="0.6" stroke="#22c8ff" stroke-width="1" stroke-dasharray="4 4" />
-  
-  <!-- Hallway Bounds: x_pixel 490 to 640, y_pixel 75 to 555 -->
-  <rect x="490" y="75" width="150" height="480" fill="#121d24" opacity="0.4" stroke="#00ffcc" stroke-width="1" stroke-dasharray="4 4" />
-
-  <!-- SECTOR LABELS -->
-  <text x="100" y="165" fill="#22c8ff" font-size="14" font-weight="950" opacity="0.8" letter-spacing="2">SECTOR A: CLASSROOM AREA (28m x 24m)</text>
-  <text x="510" y="105" fill="#00ffcc" font-size="14" font-weight="950" opacity="0.8" letter-spacing="2" transform="rotate(90, 510, 105)" transform-origin="510 105">SECTOR B: ROTATED CORRIDOR (10m x 32m)</text>
-
-  <!-- CLASSROOM PROPS & ELEMENTS -->
-  <!-- Chalkboard at North Wall (Z=-12 => Y=135, centered, width 12 => width 180px) -->
-  <rect x="190" y="135" width="180" height="10" fill="#101114" stroke="#a3a3a3" stroke-width="1.5" />
-  <rect x="200" y="138" width="160" height="4" fill="#064e3b" />
-  <text x="215" y="153" fill="#a3a3a3" font-size="9">CHALKBOARD (NORTH WALL)</text>
-
-  <!-- Teacher's Desk: X=0 => cx=280, Z=-7.5 => cy=202.5. Desk dimensions: width 3.2m => 48px, depth 1.6m => 24px -->
-  <rect x="256" y="190" width="48" height="24" rx="2" fill="#3b2314" stroke="#5c3821" stroke-width="1" />
-  <text x="259" y="205" fill="#ffffff" font-size="8" font-weight="bold">TEACHER</text>
-  <text x="265" y="224" fill="#a3a3a3" font-size="7">DESK PROP</text>
-
-  <!-- Student Desks (Classroom Obstacles) -->
-  <!-- Desk rows mapped across space -->
-  <!-- Row 1 -->
-  <g transform="translate(130, 260)">
-    <rect x="0" y="0" width="30" height="20" rx="1" fill="#2b2d35" stroke="#484b54" />
-    <text x="6" y="12" fill="#888c94" font-size="7">DESK 1</text>
-  </g>
-  <g transform="translate(210, 260)">
-    <rect x="0" y="0" width="30" height="20" rx="1" fill="#2b2d35" stroke="#484b54" />
-    <text x="6" y="12" fill="#888c94" font-size="7">DESK 2</text>
-  </g>
-  <g transform="translate(290, 260)">
-    <rect x="0" y="0" width="30" height="20" rx="1" fill="#2b2d35" stroke="#484b54" />
-    <text x="6" y="12" fill="#888c94" font-size="7">DESK 3</text>
-  </g>
-  <g transform="translate(370, 260)">
-    <rect x="0" y="0" width="30" height="20" rx="1" fill="#2b2d35" stroke="#484b54" />
-    <text x="6" y="12" fill="#888c94" font-size="7">DESK 4</text>
+  <!-- COMPASS -->
+  <g transform="translate(1090,90)" stroke="#3b4252" fill="#7c8694" font-size="10" font-weight="bold">
+    <circle cx="0" cy="0" r="26" fill="#111317" stroke="#2d3139"/>
+    <path d="M0,-22 L0,22 M-22,0 L22,0" stroke="#2d3139" stroke-width="1"/>
+    <text x="-4" y="-15" fill="#22c8ff">N</text>
+    <text x="-3" y="24" fill="#7c8694">S</text>
+    <text x="14" y="4" fill="#7c8694">E</text>
+    <text x="-20" y="4" fill="#7c8694">W</text>
   </g>
 
-  <!-- Row 2 -->
-  <g transform="translate(130, 330)">
-    <rect x="0" y="0" width="30" height="20" rx="1" fill="#2b2d35" stroke="#484b54" />
-    <text x="6" y="12" fill="#888c94" font-size="7">DESK 5</text>
-  </g>
-  <g transform="translate(210, 330)">
-    <rect x="0" y="0" width="30" height="20" rx="1" fill="#2b2d35" stroke="#484b54" />
-    <text x="6" y="12" fill="#888c94" font-size="7">DESK 6</text>
-  </g>
-  <g transform="translate(290, 330)">
-    <rect x="0" y="0" width="30" height="20" rx="1" fill="#2b2d35" stroke="#484b54" />
-    <text x="6" y="12" fill="#888c94" font-size="7">DESK 7</text>
-  </g>
-  <g transform="translate(370, 330)">
-    <rect x="0" y="0" width="30" height="20" rx="1" fill="#2b2d35" stroke="#484b54" />
-    <text x="6" y="12" fill="#888c94" font-size="7">DESK 8</text>
+  <!-- ============ SECTOR FLOORS ============ -->
+  <!-- Classroom 1 (spawn): X[-14,14] Z[-12,12] -> px[90,454] py[258,522] -->
+  <rect x="90" y="258" width="364" height="264" fill="#14171d" opacity="0.65" stroke="#22c8ff" stroke-width="1" stroke-dasharray="4 4"/>
+  <text x="104" y="278" fill="#22c8ff" font-size="13" font-weight="900" letter-spacing="1">CLASSROOM 101B — SPAWN ROOM (28m x 24m)</text>
+
+  <!-- Hallway: X[14,22] Z[-25,25] -> px[454,558] py[115,665] -->
+  <rect x="454" y="115" width="104" height="550" fill="#121d24" opacity="0.5" stroke="#00ffcc" stroke-width="1" stroke-dasharray="4 4"/>
+  <text x="506" y="130" fill="#00ffcc" font-size="12" font-weight="900" letter-spacing="1" transform="rotate(90,506,130)">MAIN CORRIDOR (8m x 50m)</text>
+
+  <!-- Classroom 2 (north): X[22,38] Z[-21.5,-3.5] -> px[558,766] py[154,352] -->
+  <rect x="558" y="154" width="208" height="198" fill="#1d1722" opacity="0.6" stroke="#c084fc" stroke-width="1" stroke-dasharray="4 4"/>
+  <text x="572" y="174" fill="#c084fc" font-size="12" font-weight="900" letter-spacing="1">CLASSROOM 102 — NORTH WING</text>
+
+  <!-- Classroom 3 (south): X[22,38] Z[3.5,21.5] -> px[558,766] py[429,627] -->
+  <rect x="558" y="429" width="208" height="198" fill="#221a17" opacity="0.6" stroke="#fb923c" stroke-width="1" stroke-dasharray="4 4"/>
+  <text x="572" y="449" fill="#fb923c" font-size="12" font-weight="900" letter-spacing="1">CLASSROOM 103 — SOUTH WING</text>
+
+  <!-- Future expansion placeholder (east of classrooms 2 & 3, X>38) -->
+  <rect x="780" y="154" width="120" height="473" fill="none" stroke="#3b4252" stroke-width="1.5" stroke-dasharray="2 6" opacity="0.7"/>
+  <text x="840" y="395" fill="#52525b" font-size="11" font-weight="bold" text-anchor="middle" transform="rotate(90,840,395)">FUTURE EXPANSION (EAST WING — UNBUILT)</text>
+
+  <!-- ============ WALLS ============ -->
+  <g fill="url(#wall-grad)" stroke="#2d3139" stroke-width="1">
+    <!-- Classroom 1 west / north / south -->
+    <rect x="87" y="255" width="6" height="270"/>
+    <rect x="87" y="255" width="370" height="6"/>
+    <rect x="87" y="519" width="370" height="6"/>
+    <!-- Classroom 1 east wall: split around exit door (Z=-12..-2 and 2..12) -->
+    <rect x="451" y="258" width="6" height="110"/>
+    <rect x="451" y="412" width="6" height="110"/>
+    <!-- Hallway west cap walls (Z=-25..-12 and 12..25) -->
+    <rect x="451" y="115" width="6" height="143"/>
+    <rect x="451" y="522" width="6" height="143"/>
+    <!-- Hallway end caps -->
+    <rect x="451" y="112" width="110" height="6"/>
+    <rect x="451" y="662" width="110" height="6"/>
+    <!-- Hallway east wall: split around north door (Z=-13.25..-11.75) and south door (11.75..13.25) -->
+    <rect x="555" y="115" width="6" height="129"/>
+    <rect x="555" y="259" width="6" height="262"/>
+    <rect x="555" y="536" width="6" height="129"/>
+    <!-- Classroom 2 north / east / south walls -->
+    <rect x="558" y="151" width="208" height="6"/>
+    <rect x="763" y="154" width="6" height="198"/>
+    <rect x="558" y="349" width="208" height="6"/>
+    <!-- Classroom 3 north / east / south walls -->
+    <rect x="558" y="426" width="208" height="6"/>
+    <rect x="763" y="429" width="6" height="198"/>
+    <rect x="558" y="624" width="208" height="6"/>
   </g>
 
-  <!-- Row 3 -->
-  <g transform="translate(130, 400)">
-    <rect x="0" y="0" width="30" height="20" rx="1" fill="#2b2d35" stroke="#484b54" />
-    <text x="6" y="12" fill="#888c94" font-size="7">DESK 9</text>
-  </g>
-  <g transform="translate(210, 400)">
-    <rect x="0" y="0" width="30" height="20" rx="1" fill="#2b2d35" stroke="#484b54" />
-    <text x="4" y="12" fill="#888c94" font-size="7">DESK 10</text>
-  </g>
-  <g transform="translate(290, 400)">
-    <rect x="0" y="0" width="30" height="20" rx="1" fill="#2b2d35" stroke="#484b54" />
-    <text x="4" y="12" fill="#888c94" font-size="7">DESK 11</text>
-  </g>
-  <g transform="translate(370, 400)">
-    <rect x="0" y="0" width="30" height="20" rx="1" fill="#2b2d35" stroke="#484b54" />
-    <text x="4" y="12" fill="#888c94" font-size="7">DESK 12</text>
-  </g>
-
-  <!-- HALLWAY PROPS (METALLIC LOCKERS) -->
-  <!-- Located along the east boundary of the hallway (X=23.5 => x_pixel = 632.5) -->
-  <g fill="#115e59" stroke="#14b8a6" stroke-width="1">
-    <!-- Locker group North -->
-    <rect x="620" y="135" width="16" height="35" rx="1" />
-    <rect x="620" y="172" width="16" height="35" rx="1" />
-    <rect x="620" y="210" width="16" height="35" rx="1" />
-    <text x="600" y="195" fill="#14b8a6" font-size="8" transform="rotate(-90, 600, 195)">LOCKERS</text>
-
-    <!-- Locker group South -->
-    <rect x="620" y="420" width="16" height="35" rx="1" />
-    <rect x="620" y="457" width="16" height="35" rx="1" />
-    <text x="600" y="445" fill="#14b8a6" font-size="8" transform="rotate(-90, 600, 445)">LOCKERS</text>
-  </g>
-
-  <!-- INTERACTIVE BUYABLE TRIGGERS -->
-  <!-- Shotgun WallBuy: West Classroom Wall (X=-14 => x_pixel=70, Z=0 => y_pixel=315) -->
-  <g transform="translate(70, 315)">
-    <!-- Glowing prompt box -->
-    <circle cx="0" cy="0" r="6" fill="#facc15" stroke="#ffffff" stroke-width="1.5">
-      <animate attributeName="r" values="5;9;5" dur="2s" repeatCount="indefinite" />
-      <animate attributeName="opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite" />
+  <!-- ============ BUYABLE DOORS ============ -->
+  <!-- DOOR 1: Classroom1<->Hallway exit (X=14 Z=0) opening Z[-2,2] -> py[368,412] -->
+  <g transform="translate(454,390)">
+    <rect x="-5" y="-22" width="10" height="44" fill="#ef4444" opacity="0.85" stroke="#fca5a5" stroke-width="1"/>
+    <circle cx="0" cy="0" r="6" fill="#ef4444" stroke="#fff" stroke-width="1">
+      <animate attributeName="opacity" values="1;0.4;1" dur="1.8s" repeatCount="indefinite"/>
     </circle>
-    <!-- Wall buy bracket outline -->
-    <path d="M 0 -15 L 20 -15 L 20 15 L 0 15" fill="none" stroke="#facc15" stroke-width="1.5" />
-    <!-- Weapon Text -->
-    <text x="25" y="-3" fill="#facc15" font-size="9" font-weight="900">SHOTGUN WALLBUY</text>
-    <text x="25" y="8" fill="#eab308" font-size="8">$700 REFILL / BUY</text>
+    <path d="M 8 0 L 26 0" stroke="#00ffcc" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="-150" y="-26" fill="#ef4444" font-size="9" font-weight="900">DOOR #1 — EAST EXIT</text>
+    <text x="-150" y="-15" fill="#f43f5e" font-size="8">$1200 · to Corridor</text>
   </g>
 
-  <!-- Buyable Exit Door / Classroom-Hallway Gate (X=14 => x_pixel=490, Z=0 => y_pixel=315) -->
-  <g transform="translate(490, 315)">
-    <!-- Glowing gate marker -->
-    <circle cx="0" cy="0" r="7" fill="#ef4444" stroke="#ffffff" stroke-width="1.5">
-      <animate attributeName="r" values="6;10;6" dur="1.8s" repeatCount="indefinite" />
-      <animate attributeName="opacity" values="1;0.5;1" dur="1.8s" repeatCount="indefinite" />
+  <!-- DOOR 2: Hallway<->Classroom2 north (X=22 Z=-12.5) opening Z[-13.25,-11.75] -> py[244,259] -->
+  <g transform="translate(558,252)">
+    <rect x="-5" y="-9" width="10" height="18" fill="#ef4444" opacity="0.85" stroke="#fca5a5" stroke-width="1"/>
+    <circle cx="0" cy="0" r="5" fill="#ef4444" stroke="#fff" stroke-width="1">
+      <animate attributeName="opacity" values="1;0.4;1" dur="1.8s" repeatCount="indefinite"/>
     </circle>
-    <!-- Double swinging barricade lines (running Z -2 to +2 => Y from 285 to 345) -->
-    <line x1="0" y1="-30" x2="0" y2="30" stroke="#f43f5e" stroke-width="4" stroke-dasharray="6 3" />
-    <!-- Indicator banner -->
-    <rect x="-115" y="-45" width="110" height="24" rx="2" fill="#1e1b1c" stroke="#ef4444" stroke-width="1" />
-    <text x="-110" y="-36" fill="#ef4444" font-size="8" font-weight="900">GATE BARRIER</text>
-    <text x="-110" y="-26" fill="#f43f5e" font-size="8">$1200 UNLOCK</text>
-    
-    <!-- Direction arrow pointing to corridor -->
-    <path d="M 12 0 L 25 0 M 21 -4 L 25 0 L 21 4" fill="none" stroke="#00ffcc" stroke-width="1.5" />
+    <path d="M 7 0 L 22 0" stroke="#00ffcc" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="14" y="-8" fill="#ef4444" font-size="9" font-weight="900">DOOR #2 — NORTH CLASSROOM</text>
+    <text x="14" y="3" fill="#f43f5e" font-size="8">$1000 · to Classroom 102</text>
   </g>
 
-  <!-- PLAYER START POSITION AND MOTION -->
-  <!-- Spawn point: typically centered at X=0, Z=4 (Y = 315 + 60 = 375) -->
-  <g transform="translate(280, 375)">
-    <!-- Pulse ring -->
-    <circle cx="0" cy="0" r="16" fill="none" stroke="#22c55e" stroke-width="1" opacity="0.8">
-      <animate attributeName="r" values="12;24;12" dur="2.5s" repeatCount="indefinite" />
-      <animate attributeName="opacity" values="0.8;0;0.8" dur="2.5s" repeatCount="indefinite" />
+  <!-- DOOR 3: Hallway<->Classroom3 south (X=22 Z=12.5) opening Z[11.75,13.25] -> py[521,537] -->
+  <g transform="translate(558,529)">
+    <rect x="-5" y="-9" width="10" height="18" fill="#ef4444" opacity="0.85" stroke="#fca5a5" stroke-width="1"/>
+    <circle cx="0" cy="0" r="5" fill="#ef4444" stroke="#fff" stroke-width="1">
+      <animate attributeName="opacity" values="1;0.4;1" dur="1.8s" repeatCount="indefinite"/>
     </circle>
-    <!-- Player icon -->
-    <circle cx="0" cy="0" r="8" fill="#22c55e" stroke="#ffffff" stroke-width="1.5" />
-    <!-- Cone of sight (green translucent triangle pointing forward/North) -->
-    <path d="M 0 0 L -30 -60 L 30 -60 Z" fill="#22c55e" opacity="0.25" />
-    <text x="12" y="4" fill="#22c55e" font-size="9" font-weight="bold" letter-spacing="0.5">PLAYER SPAWN</text>
+    <path d="M 7 0 L 22 0" stroke="#00ffcc" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="14" y="-8" fill="#ef4444" font-size="9" font-weight="900">DOOR #3 — SOUTH CLASSROOM</text>
+    <text x="14" y="3" fill="#f43f5e" font-size="8">$1500 · to Classroom 103</text>
   </g>
 
-  <!-- HARDWARE SOLID ARENA WALLS (THICK CORNER SPECIFICATIONS) -->
-  <g fill="url(#wall-grad)" stroke="#2d3139" stroke-width="1.5">
-    <!-- CLASSROOM WEST WALL -->
-    <rect x="66" y="131" width="8" height="368" />
-    <!-- CLASSROOM NORTH WALL -->
-    <rect x="66" y="131" width="428" height="8" />
-    <!-- CLASSROOM SOUTH WALL -->
-    <rect x="66" y="491" width="428" height="8" />
-    <!-- CLASSROOM TO HALLWAY BORDER WALL CHUNKS (Separating east side) -->
-    <!-- North partition from Y=135 to 285 (Z = -12 to -2) -->
-    <rect x="486" y="131" width="8" height="154" />
-    <!-- South partition from Y=345 to 495 (Z = 2 to 12) -->
-    <rect x="486" y="345" width="8" height="154" />
-
-    <!-- HALLWAY EXTRA ENCAPSULATING CAP WALLS -->
-    <!-- Extra west wall North of classroom connection (Y=75 to 135) -->
-    <rect x="486" y="71" width="8" height="64" />
-    <!-- Extra west wall South of classroom connection (Y=495 to 555) -->
-    <rect x="486" y="491" width="8" height="64" />
-    <!-- Hallway North end cap -->
-    <rect x="486" y="71" width="158" height="8" />
-    <!-- Hallway South end cap -->
-    <rect x="486" y="551" width="158" height="8" />
-    <!-- Hallway East back boundary wall -->
-    <rect x="636" y="71" width="8" height="488" />
+  <!-- ============ WALL BUYS ============ -->
+  <!-- Shotgun wallbuy: west wall of Classroom 1 (X=-13.7 Z=-1.5) -> px[92] py[373] -->
+  <g transform="translate(95,373)">
+    <rect x="-4" y="-12" width="14" height="24" fill="none" stroke="#facc15" stroke-width="1.5"/>
+    <circle cx="3" cy="0" r="5" fill="#facc15" stroke="#fff" stroke-width="1">
+      <animate attributeName="opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <text x="16" y="-2" fill="#facc15" font-size="9" font-weight="900">WALL BUY: SHOTGUN</text>
+    <text x="16" y="9" fill="#eab308" font-size="8">$700 buy / $350 refill</text>
   </g>
 
-  <!-- LIGHTING ALARM SPOTLIGHT HIGHLIGHTS -->
-  <!-- Red halogen flashing alarm light in hallway (X=19, Z=-8) => (315 + 120 = 435, 315 - 120 = 195) -->
-  <circle cx="565" cy="195" r="30" fill="#ef4444" opacity="0.08" />
-  <circle cx="565" cy="195" r="4" fill="#f87171" stroke="#ef4444" stroke-width="1" />
-  
-  <!-- Blue emergency beacon spotlight (X=19, Z=8) -->
-  <circle cx="565" cy="435" r="30" fill="#38bdf8" opacity="0.08" />
-  <circle cx="565" cy="435" r="4" fill="#7dd3fc" stroke="#38bdf8" stroke-width="1" />
+  <!-- SMG wallbuy: east wall of Hallway (X=21.7 Z=-17) -> px[554] py[203] -->
+  <g transform="translate(551,203)">
+    <rect x="-10" y="-12" width="14" height="24" fill="none" stroke="#facc15" stroke-width="1.5"/>
+    <circle cx="-3" cy="0" r="5" fill="#facc15" stroke="#fff" stroke-width="1">
+      <animate attributeName="opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <text x="-150" y="-2" fill="#facc15" font-size="9" font-weight="900">WALL BUY: MP5 SMG</text>
+    <text x="-150" y="9" fill="#eab308" font-size="8">$1000 buy / $500 refill</text>
+  </g>
 
-  <!-- MOONLIGHT WINDOW EMBEVELLING (NORTH AND SOUTH WALLS) -->
-  <!-- Left Window North -->
-  <line x1="130" y1="131" x2="160" y2="131" stroke="#38bdf8" stroke-width="2" />
-  <!-- Right Window North -->
-  <line x1="400" y1="131" x2="430" y2="131" stroke="#38bdf8" stroke-width="2" />
-  <!-- Left Window South -->
-  <line x1="130" y1="499" x2="160" y2="499" stroke="#38bdf8" stroke-width="2" />
-  <!-- Right Window South -->
-  <line x1="400" y1="499" x2="430" y2="499" stroke="#38bdf8" stroke-width="2" />
+  <!-- ============ PERK MACHINE: FAST HANDS ============ -->
+  <!-- (X=-11.6 Z=-9.4) -> px[121] py[287] ; NW corner, far from east entrance -->
+  <g transform="translate(121,287)">
+    <circle cx="0" cy="0" r="22" fill="#ef4444" opacity="0.08"/>
+    <rect x="-9" y="-9" width="18" height="18" rx="2" fill="#7f1d1d" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="0" y="4" fill="#fecaca" font-size="11" font-weight="900" text-anchor="middle">⚡</text>
+    <text x="14" y="-4" fill="#ef4444" font-size="9" font-weight="900">FAST HANDS PERK</text>
+    <text x="14" y="7" fill="#f87171" font-size="8">$2000 · faster reload</text>
+    <text x="14" y="17" fill="#737373" font-size="7">Marble angel shrine — far NW corner</text>
+  </g>
 
-  <!-- DIMENSION LABELS AND GUIDE MARKS -->
-  <!-- Classroom width label -->
-  <line x1="74" y1="515" x2="482" y2="515" stroke="#22c8ff" stroke-width="1" stroke-dasharray="2 2" />
-  <path d="M 74 511 L 74 519 M 482 511 L 482 519" stroke="#22c8ff" stroke-width="1" />
-  <text x="250" y="530" fill="#22c8ff" font-size="10" font-weight="bold" text-anchor="middle">28 METERS</text>
+  <!-- ============ THE FORBIDDEN TOME ============ -->
+  <!-- (X=12.3 Z=8.0) -> px[427] py[478] ; east wall of spawn classroom -->
+  <g transform="translate(427,478)">
+    <circle cx="0" cy="0" r="20" fill="#9c2b2b" opacity="0.12">
+      <animate attributeName="r" values="14;24;14" dur="2.4s" repeatCount="indefinite"/>
+    </circle>
+    <rect x="-10" y="-8" width="20" height="16" rx="1" fill="#3a0d0a" stroke="#e0b048" stroke-width="1.5"/>
+    <line x1="0" y1="-8" x2="0" y2="8" stroke="#e0b048" stroke-width="1"/>
+    <text x="-78" y="-12" fill="#e0b048" font-size="9" font-weight="900">THE FORBIDDEN TOME</text>
+    <text x="-78" y="-2" fill="#cbb27a" font-size="8">$950 · random weapon</text>
+    <text x="-78" y="22" fill="#737373" font-size="7">Cursed book on pedestal (east wall)</text>
+  </g>
 
-  <!-- Classroom depth label -->
-  <line x1="45" y1="135" x2="45" y2="495" stroke="#22c8ff" stroke-width="1" stroke-dasharray="2 2" />
-  <path d="M 41 135 L 49 135 M 41 495 L 49 495" stroke="#22c8ff" stroke-width="1" />
-  <text x="25" y="320" fill="#22c8ff" font-size="10" font-weight="bold" text-anchor="middle" transform="rotate(-90, 25, 320)">24 METERS</text>
+  <!-- ============ PLAYER SPAWN ============ -->
+  <!-- (X=0 Z=2.5) -> px[272] py[418] -->
+  <g transform="translate(272,418)">
+    <circle cx="0" cy="0" r="14" fill="none" stroke="#22c55e" stroke-width="1" opacity="0.8">
+      <animate attributeName="r" values="10;22;10" dur="2.5s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.8;0;0.8" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="0" cy="0" r="8" fill="#22c55e" stroke="#fff" stroke-width="1.5"/>
+    <path d="M 0 0 L -22 -42 L 22 -42 Z" fill="#22c55e" opacity="0.2"/>
+    <text x="12" y="5" fill="#22c55e" font-size="9" font-weight="bold">PLAYER SPAWN</text>
+  </g>
 
-  <!-- Hallway depth label -->
-  <line x1="662" y1="75" x2="662" y2="555" stroke="#00ffcc" stroke-width="1" stroke-dasharray="2 2" />
-  <path d="M 658 75 L 666 75 M 658 555 L 666 555" stroke="#00ffcc" stroke-width="1" />
-  <text x="680" y="320" fill="#00ffcc" font-size="10" font-weight="bold" text-anchor="middle" transform="rotate(90, 680, 320)">32 METERS</text>
+  <!-- ============ ZOMBIE SPAWN POINTS (12) ============ -->
+  <!-- groundSpawners[] mapped 1:1 -->
+  <g font-size="7" fill="#a78bfa">
+    <!-- Classroom 1 -->
+    <g transform="translate(142,302)"><polygon points="0,-6 5,5 -5,5" fill="#7c3aed" stroke="#c4b5fd" stroke-width="0.8"/><text x="8" y="3">Z1 NW</text></g>
+    <g transform="translate(402,302)"><polygon points="0,-6 5,5 -5,5" fill="#7c3aed" stroke="#c4b5fd" stroke-width="0.8"/><text x="-30" y="3">Z2 NE</text></g>
+    <g transform="translate(142,478)"><polygon points="0,-6 5,5 -5,5" fill="#7c3aed" stroke="#c4b5fd" stroke-width="0.8"/><text x="8" y="3">Z3 SW</text></g>
+    <g transform="translate(402,478)"><polygon points="0,-6 5,5 -5,5" fill="#7c3aed" stroke="#c4b5fd" stroke-width="0.8"/><text x="-30" y="3">Z4 SE</text></g>
+    <g transform="translate(194,401)"><polygon points="0,-6 5,5 -5,5" fill="#7c3aed" stroke="#c4b5fd" stroke-width="0.8"/><text x="8" y="3">Z5 W</text></g>
+    <g transform="translate(350,379)"><polygon points="0,-6 5,5 -5,5" fill="#7c3aed" stroke="#c4b5fd" stroke-width="0.8"/><text x="-26" y="3">Z6 E</text></g>
+    <!-- Hallway -->
+    <g transform="translate(506,324)"><polygon points="0,-6 5,5 -5,5" fill="#7c3aed" stroke="#c4b5fd" stroke-width="0.8"/><text x="8" y="3">Z7</text></g>
+    <g transform="translate(506,456)"><polygon points="0,-6 5,5 -5,5" fill="#7c3aed" stroke="#c4b5fd" stroke-width="0.8"/><text x="8" y="3">Z8</text></g>
+    <!-- Classroom 2 -->
+    <g transform="translate(662,186)"><polygon points="0,-6 5,5 -5,5" fill="#7c3aed" stroke="#c4b5fd" stroke-width="0.8"/><text x="8" y="3">Z9</text></g>
+    <g transform="translate(688,296)"><polygon points="0,-6 5,5 -5,5" fill="#7c3aed" stroke="#c4b5fd" stroke-width="0.8"/><text x="8" y="3">Z10</text></g>
+    <!-- Classroom 3 -->
+    <g transform="translate(662,484)"><polygon points="0,-6 5,5 -5,5" fill="#7c3aed" stroke="#c4b5fd" stroke-width="0.8"/><text x="8" y="3">Z11</text></g>
+    <g transform="translate(688,594)"><polygon points="0,-6 5,5 -5,5" fill="#7c3aed" stroke="#c4b5fd" stroke-width="0.8"/><text x="8" y="3">Z12</text></g>
+  </g>
 
-  <!-- DIAGNOSTICS & LEGEND CONTROLS (HUD SIDEBAR) -->
-  <g transform="translate(680, 40)" fill="#a3a3a3" font-size="9">
-    <rect x="-10" y="0" width="180" height="470" rx="3" fill="#111317" stroke="#1d2026" stroke-width="1.5" />
+  <!-- ============ PROPS ============ -->
+  <!-- Chalkboard (north wall of classroom 1) -->
+  <rect x="220" y="258" width="120" height="6" fill="#064e3b" stroke="#a3a3a3" stroke-width="0.8"/>
+  <text x="232" y="252" fill="#6b7280" font-size="7">CHALKBOARD</text>
+  <!-- Teacher desk (X=0 Z=-7.5) -> px[272] py[308] -->
+  <rect x="250" y="300" width="44" height="18" rx="2" fill="#3b2314" stroke="#5c3821"/>
+  <text x="254" y="312" fill="#9ca3af" font-size="7">TEACHER DESK</text>
+  <!-- Hallway lockers along east wall -->
+  <g fill="#115e59" stroke="#14b8a6" stroke-width="0.8">
+    <rect x="544" y="280" width="10" height="30" rx="1"/>
+    <rect x="544" y="312" width="10" height="30" rx="1"/>
+    <rect x="544" y="440" width="10" height="30" rx="1"/>
+    <rect x="544" y="472" width="10" height="30" rx="1"/>
+  </g>
+  <text x="528" y="395" fill="#14b8a6" font-size="7" transform="rotate(-90,528,395)">CORRIDOR LOCKERS</text>
+
+  <!-- ============ HALLWAY NAME LABELS ============ -->
+  <text x="506" y="640" fill="#5eead4" font-size="8" text-anchor="middle" font-weight="bold" letter-spacing="1">"THE LONG HALL"</text>
+
+  <!-- ============ LEGEND ============ -->
+  <g transform="translate(930,150)" font-size="9" fill="#a3a3a3">
+    <rect x="-12" y="0" width="216" height="402" rx="3" fill="#111317" stroke="#1d2026" stroke-width="1.5"/>
     <text x="0" y="22" fill="#ffffff" font-size="11" font-weight="950" letter-spacing="1">ARENA DIRECTORY</text>
-    <line x1="0" y1="32" x2="160" y2="32" stroke="#2d3139" stroke-width="1" />
+    <line x1="0" y1="30" x2="192" y2="30" stroke="#2d3139"/>
 
-    <!-- Item 1: Player Start -->
-    <circle cx="10" cy="55" r="5" fill="#22c55e" stroke="#ffffff" stroke-width="1" />
-    <text x="25" y="58" fill="#ffffff" font-weight="bold">PLAYER SPAWN</text>
-    <text x="25" y="70" fill="#737373" font-size="8">Central classroom starting spot</text>
+    <circle cx="6" cy="48" r="6" fill="#22c55e" stroke="#fff" stroke-width="1"/>
+    <text x="22" y="51" fill="#fff" font-weight="bold">PLAYER SPAWN</text>
 
-    <!-- Item 2: Classroom Door -->
-    <rect x="5" y="90" width="10" height="10" fill="#ef4444" />
-    <text x="25" y="98" fill="#ffffff" font-weight="bold">BUYABLE GATE ($1200)</text>
-    <text x="25" y="110" fill="#737373" font-size="8">Opens Hallway access</text>
+    <polygon points="6,58 11,69 1,69" transform="translate(0,4)" fill="#7c3aed" stroke="#c4b5fd" stroke-width="0.8"/>
+    <text x="22" y="74" fill="#fff" font-weight="bold">ZOMBIE SPAWN (x12)</text>
 
-    <!-- Item 3: Shotgun WallBuy -->
-    <rect x="5" y="130" width="10" height="10" fill="#facc15" />
-    <text x="25" y="138" fill="#ffffff" font-weight="bold">SHOTGUN WALLBUY</text>
-    <text x="25" y="150" fill="#737373" font-size="8">$700 shotgun item &amp; ammo</text>
+    <rect x="0" y="88" width="12" height="12" fill="#ef4444" stroke="#fca5a5"/>
+    <text x="22" y="98" fill="#fff" font-weight="bold">BUYABLE DOOR (#1-3)</text>
 
-    <!-- Item 4: Student Desks -->
-    <rect x="5" y="170" width="10" height="10" fill="#2b2d35" stroke="#484b54" />
-    <text x="25" y="178" fill="#ffffff" font-weight="bold">CLASSROOM DESKS</text>
-    <text x="25" y="190" fill="#737373" font-size="8">Solid path blockers / obstacles</text>
+    <rect x="0" y="110" width="12" height="12" fill="none" stroke="#facc15" stroke-width="1.5"/>
+    <text x="22" y="120" fill="#fff" font-weight="bold">WALL BUY (Shotgun/SMG)</text>
 
-    <!-- Item 5: Lockers -->
-    <rect x="5" y="210" width="10" height="10" fill="#115e59" stroke="#14b8a6" />
-    <text x="25" y="218" fill="#ffffff" font-weight="bold">METAL LOCKERS</text>
-    <text x="25" y="230" fill="#737373" font-size="8">Corridor side barriers</text>
+    <rect x="0" y="132" width="12" height="12" rx="2" fill="#7f1d1d" stroke="#ef4444"/>
+    <text x="22" y="142" fill="#fff" font-weight="bold">FAST HANDS PERK</text>
 
-    <!-- Item 6: Window Moonlight -->
-    <line x1="5" y1="255" x2="15" y2="255" stroke="#38bdf8" stroke-width="3" />
-    <text x="25" y="258" fill="#ffffff" font-weight="bold">WINDOW SHADOWS</text>
-    <text x="25" y="270" fill="#737373" font-size="8">Eery moonbeams cast light</text>
+    <rect x="0" y="154" width="12" height="12" rx="1" fill="#3a0d0a" stroke="#e0b048"/>
+    <text x="22" y="164" fill="#fff" font-weight="bold">THE FORBIDDEN TOME</text>
 
-    <line x1="0" y1="295" x2="160" y2="295" stroke="#2d3139" stroke-width="1" />
-    
-    <text x="0" y="315" fill="#a3a3a3" font-size="9" font-weight="bold">ARENA EXTREMES (3D):</text>
-    <text x="0" y="333" fill="#8a8a8a" font-size="8">CLASSROOM:</text>
-    <text x="10" y="347" fill="#22c8ff" font-family="monospace">W: -14.0 to +14.0</text>
-    <text x="10" y="359" fill="#22c8ff" font-family="monospace">D: -12.0 to +12.0</text>
-    
-    <text x="0" y="380" fill="#8a8a8a" font-size="8">HALLWAY CORRIDOR:</text>
-    <text x="10" y="394" fill="#00ffcc" font-family="monospace">W: +14.0 to +24.0</text>
-    <text x="10" y="406" fill="#00ffcc" font-family="monospace">D: -16.0 to +16.0</text>
+    <rect x="0" y="176" width="12" height="12" fill="#3b2314" stroke="#5c3821"/>
+    <text x="22" y="186" fill="#fff" font-weight="bold">PROPS / OBSTACLES</text>
 
-    <!-- Operational status line -->
-    <line x1="0" y1="430" x2="160" y2="430" stroke="#22c8ff" opacity="0.3" stroke-width="1" />
-    <text x="0" y="448" fill="#00ffcc" font-weight="bold" font-size="8">● MAP ENGINE ACTIVE</text>
-    <text x="0" y="458" fill="#60a5fa" font-size="7">SYSTEM BUILD COOP ARENA</text>
+    <line x1="0" y1="202" x2="192" y2="202" stroke="#2d3139"/>
+    <text x="0" y="220" fill="#a3a3a3" font-weight="bold">ROOM COORDS (X, Z):</text>
+    <text x="0" y="236" fill="#22c8ff" font-size="8">CLASSROOM 101B: X[-14,14] Z[-12,12]</text>
+    <text x="0" y="250" fill="#00ffcc" font-size="8">CORRIDOR: X[14,22] Z[-25,25]</text>
+    <text x="0" y="264" fill="#c084fc" font-size="8">CLASSROOM 102: X[22,38] Z[-21.5,-3.5]</text>
+    <text x="0" y="278" fill="#fb923c" font-size="8">CLASSROOM 103: X[22,38] Z[3.5,21.5]</text>
+
+    <line x1="0" y1="294" x2="192" y2="294" stroke="#2d3139"/>
+    <text x="0" y="312" fill="#a3a3a3" font-weight="bold">DOOR INDEX:</text>
+    <text x="0" y="328" fill="#f87171" font-size="8">#1 EAST EXIT — $1200</text>
+    <text x="0" y="342" fill="#f87171" font-size="8">#2 NORTH CLASSROOM — $1000</text>
+    <text x="0" y="356" fill="#f87171" font-size="8">#3 SOUTH CLASSROOM — $1500</text>
+
+    <line x1="0" y1="372" x2="192" y2="372" stroke="#22c8ff" opacity="0.3"/>
+    <text x="0" y="390" fill="#00ffcc" font-size="8" font-weight="bold">● LAYOUT SYNCED TO BUILD</text>
   </g>
 
-  <!-- AUDIO FREQUENCY GRAPH (DECORATIVE TECH HUD ELEMENT) -->
-  <path d="M 30 580 Q 80 560 130 580 T 230 580 T 330 580 T 430 580 T 530 580 T 630 580" fill="none" stroke="#22c8ff" stroke-width="1.5" opacity="0.4" />
-  <path d="M 30 580 Q 80 595 130 580 T 230 580 T 330 580 T 430 580 T 530 580 T 630 580" fill="none" stroke="#00ffcc" stroke-width="1" opacity="0.25" />
-  <circle cx="330" cy="580" r="3" fill="#22c8ff" />
-  <text x="340" y="583" fill="#737373" font-size="7" letter-spacing="1">ZOMBIE SPAWN FREQUENCY PROFILE</text>
+  <!-- DIMENSION GUIDES -->
+  <line x1="90" y1="540" x2="454" y2="540" stroke="#22c8ff" stroke-width="1" stroke-dasharray="2 2"/>
+  <text x="272" y="554" fill="#22c8ff" font-size="10" font-weight="bold" text-anchor="middle">28 METERS</text>
+  <line x1="558" y1="645" x2="766" y2="645" stroke="#fb923c" stroke-width="1" stroke-dasharray="2 2"/>
+  <text x="662" y="659" fill="#fb923c" font-size="10" font-weight="bold" text-anchor="middle">16 METERS</text>
 
-  <!-- DECORATIVE CORNER BRACKETS -->
-  <path d="M 15 15 L 15 35 M 15 15 L 35 15" fill="none" stroke="#3b4252" stroke-width="2" />
-  <path d="M 865 15 L 865 35 M 865 15 L 845 15" fill="none" stroke="#3b4252" stroke-width="2" />
-  <path d="M 15 625 L 15 605 M 15 625 L 35 625" fill="none" stroke="#3b4252" stroke-width="2" />
-  <path d="M 865 625 L 865 605 M 865 625 L 845 625" fill="none" stroke="#3b4252" stroke-width="2" />
+  <!-- CORNER BRACKETS -->
+  <path d="M 15 15 L 15 35 M 15 15 L 35 15" fill="none" stroke="#3b4252" stroke-width="2"/>
+  <path d="M 1165 15 L 1165 35 M 1165 15 L 1145 15" fill="none" stroke="#3b4252" stroke-width="2"/>
+  <path d="M 15 765 L 15 745 M 15 765 L 35 765" fill="none" stroke="#3b4252" stroke-width="2"/>
+  <path d="M 1165 765 L 1165 745 M 1165 765 L 1145 765" fill="none" stroke="#3b4252" stroke-width="2"/>
 </svg>

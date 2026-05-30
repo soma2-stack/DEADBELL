@@ -121,11 +121,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     wonder_weapon: { clip: 0, reserve: 0, maxClip: 15, maxReserve: 45 }
   });
 
+  // THE FORBIDDEN TOME (cursed book reward machine — formerly the "mystery box").
+  // Stands against the East wall of the spawn classroom, clear of the exit doorway (z in
+  // [-2,2]) with room in front for the player to approach and interact.
   const mysteryBoxRef = useRef({
     state: 'idle' as 'idle' | 'spinning' | 'ready',
     weaponId: 'pistol' as 'pistol' | 'shotgun' | 'smg' | 'm16' | 'magnum' | 'sniper' | 'wonder_weapon',
-    position: [28.0, 0, 12.5] as [number, number, number],
-    rotationY: 0,
+    position: [12.3, 0, 8.0] as [number, number, number],
+    rotationY: -Math.PI / 2, // book faces west, into the room (away from the east wall)
     price: 950,
     lidGroup: null as THREE.Group | null,
     weaponGlowGroup: null as THREE.Group | null,
@@ -148,9 +151,17 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     readyTimeoutTimer: null as any
   });
 
+  // Live mirror of hasFastHands so the once-created render-loop closure always sees the
+  // current value (the main useEffect has an empty dep array and would otherwise capture
+  // the initial `false`, breaking both the purchase guard and the reload-speed bonus).
+  const hasFastHandsRef = useRef(hasFastHands);
+  useEffect(() => { hasFastHandsRef.current = hasFastHands; }, [hasFastHands]);
+
   const perkMachineRef = useRef({
-    position: [33.5, 0, -12.5] as [number, number, number],
-    rotationY: -Math.PI / 2, // facing West inside Classroom 2
+    // Far corner of the spawn classroom (NW), furthest from the east entrance door at (14,0).
+    // Tucked against the west/north walls but offset enough not to block movement or paths.
+    position: [-11.6, 0, -9.4] as [number, number, number],
+    rotationY: Math.PI / 4, // angled to face the room centre (south-east) for visibility
     price: 2000,
     meshGroup: null as THREE.Group | null
   });
@@ -1145,65 +1156,124 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     createHallwayLocker(14.5, 15.0, Math.PI / 2);
     createHallwayLocker(14.5, 22.5, Math.PI / 2);
 
-    // --- PROCEDURAL FAST HANDS PERK MACHINE ---
+    // --- PROCEDURAL FAST HANDS PERK SHRINE (marble angel pedestal) ---
+    // A worn marble pedestal topped by a stone angel that presents a glowing tome.
+    // Buying the perk = the angel "presents the book" and reload speed increases.
     const buildPerkMachineMesh = () => {
       const pmGroup = new THREE.Group();
-      const chromeMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.9, roughness: 0.15 });
 
-      const bodyGeo = new THREE.BoxGeometry(0.95, 1.85, 0.7);
-      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x8b0000, roughness: 0.35, metalness: 0.8 });
-      const pmBody = new THREE.Mesh(bodyGeo, bodyMat);
-      pmBody.position.y = 1.85 / 2;
-      pmBody.castShadow = true;
-      pmBody.receiveShadow = true;
-      pmGroup.add(pmBody);
+      // Procedural marble texture (worn, veined) reused across the stone parts.
+      const marbleCanvas = document.createElement('canvas');
+      marbleCanvas.width = 256; marbleCanvas.height = 256;
+      const mc = marbleCanvas.getContext('2d')!;
+      const mgrad = mc.createLinearGradient(0, 0, 256, 256);
+      mgrad.addColorStop(0, '#d9d4c8');
+      mgrad.addColorStop(0.5, '#c2bba9');
+      mgrad.addColorStop(1, '#a8a08c');
+      mc.fillStyle = mgrad; mc.fillRect(0, 0, 256, 256);
+      // Grime blotches
+      for (let i = 0; i < 40; i++) {
+        mc.fillStyle = `rgba(60,55,45,${0.04 + Math.random() * 0.08})`;
+        const r = 6 + Math.random() * 26;
+        mc.beginPath(); mc.arc(Math.random() * 256, Math.random() * 256, r, 0, Math.PI * 2); mc.fill();
+      }
+      // Marble veins
+      mc.strokeStyle = 'rgba(90,84,70,0.45)'; mc.lineWidth = 1.4;
+      for (let i = 0; i < 10; i++) {
+        mc.beginPath();
+        let x = Math.random() * 256, y = Math.random() * 256;
+        mc.moveTo(x, y);
+        for (let s = 0; s < 5; s++) { x += (Math.random() - 0.5) * 90; y += (Math.random() - 0.5) * 90; mc.lineTo(x, y); }
+        mc.stroke();
+      }
+      const marbleTex = new THREE.CanvasTexture(marbleCanvas);
+      marbleTex.wrapS = marbleTex.wrapT = THREE.RepeatWrapping;
+      const marbleMat = new THREE.MeshStandardMaterial({ map: marbleTex, color: 0xece7da, roughness: 0.55, metalness: 0.08 });
+      const wornStoneMat = new THREE.MeshStandardMaterial({ map: marbleTex, color: 0xb8b09c, roughness: 0.85, metalness: 0.05 });
+      const goldMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.3, metalness: 0.9, emissive: 0x3a2c08, emissiveIntensity: 0.6 });
 
-      const cabinetGeo = new THREE.BoxGeometry(0.8, 0.9, 0.1);
-      const cabinetMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, emissive: 0x331111, emissiveIntensity: 2.5 });
-      const cabinet = new THREE.Mesh(cabinetGeo, cabinetMat);
-      cabinet.position.set(0, 1.0, 0.31);
-      pmGroup.add(cabinet);
+      // Stepped pedestal base
+      const baseBottom = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.22, 1.15), wornStoneMat);
+      baseBottom.position.y = 0.11; baseBottom.castShadow = true; baseBottom.receiveShadow = true;
+      pmGroup.add(baseBottom);
+      const baseMid = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.18, 0.95), wornStoneMat);
+      baseMid.position.y = 0.31; baseMid.castShadow = true; baseMid.receiveShadow = true;
+      pmGroup.add(baseMid);
 
-      const coinSlider = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.16, 0.08), chromeMat);
-      coinSlider.position.set(-0.25, 1.1, 0.36);
-      pmGroup.add(coinSlider);
+      // Fluted column
+      const column = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.38, 1.0, 16), marbleMat);
+      column.position.y = 0.9; column.castShadow = true; column.receiveShadow = true;
+      pmGroup.add(column);
+      // Vertical flute grooves (thin gold inlays as glowing accents)
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        const flute = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.92, 0.025), goldMat);
+        flute.position.set(Math.cos(a) * 0.345, 0.9, Math.sin(a) * 0.345);
+        pmGroup.add(flute);
+      }
 
-      const trayGeo = new THREE.BoxGeometry(0.48, 0.28, 0.2);
-      const pmTray = new THREE.Mesh(trayGeo, blackMetalMaterial);
-      pmTray.position.set(0, 0.24, 0.31);
-      pmGroup.add(pmTray);
+      // Capital (top of column)
+      const capital = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.16, 0.78), marbleMat);
+      capital.position.y = 1.48; capital.castShadow = true; capital.receiveShadow = true;
+      pmGroup.add(capital);
 
-      const headerGeo = new THREE.BoxGeometry(0.82, 0.28, 0.12);
-      const headerMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5 });
-      const pmHeader = new THREE.Mesh(headerGeo, headerMat);
-      pmHeader.position.set(0, 1.62, 0.32);
-      pmGroup.add(pmHeader);
+      // --- STONE ANGEL standing on the capital, presenting the book forward ---
+      const angel = new THREE.Group();
+      angel.position.y = 1.56;
+      // Robe / body
+      const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.28, 0.75, 12), marbleMat);
+      robe.position.y = 0.4; robe.castShadow = true; angel.add(robe);
+      // Head
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 16), marbleMat);
+      head.position.y = 0.92; head.castShadow = true; angel.add(head);
+      // Halo (glowing gold ring)
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.018, 8, 24), goldMat);
+      halo.position.set(0, 1.02, -0.02); halo.rotation.x = Math.PI / 2.2; angel.add(halo);
+      // Wings (flattened, swept back)
+      const wingGeo = new THREE.BoxGeometry(0.06, 0.55, 0.34);
+      const wingL = new THREE.Mesh(wingGeo, marbleMat);
+      wingL.position.set(-0.2, 0.55, -0.12); wingL.rotation.z = 0.35; wingL.rotation.y = 0.5; wingL.castShadow = true; angel.add(wingL);
+      const wingR = new THREE.Mesh(wingGeo, marbleMat);
+      wingR.position.set(0.2, 0.55, -0.12); wingR.rotation.z = -0.35; wingR.rotation.y = -0.5; wingR.castShadow = true; angel.add(wingR);
+      // Outstretched arms holding the offered book forward (+Z)
+      const armL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.4), marbleMat);
+      armL.position.set(-0.13, 0.55, 0.2); angel.add(armL);
+      const armR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.4), marbleMat);
+      armR.position.set(0.13, 0.55, 0.2); angel.add(armR);
+      // The presented "fast hands" tome resting on the hands, with a glowing cover
+      const offeredBook = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.07, 0.26), new THREE.MeshStandardMaterial({ color: 0x6b1414, roughness: 0.6, metalness: 0.2, emissive: 0xef4444, emissiveIntensity: 1.2 }));
+      offeredBook.position.set(0, 0.5, 0.4); offeredBook.castShadow = true; angel.add(offeredBook);
+      const bookGild = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.012, 0.28), goldMat);
+      bookGild.position.set(0, 0.54, 0.4); angel.add(bookGild);
+      pmGroup.add(angel);
 
+      // FAST HANDS engraved plaque on the front of the pedestal
       const fhCanvas = document.createElement('canvas');
-      fhCanvas.width = 256;
-      fhCanvas.height = 64;
+      fhCanvas.width = 256; fhCanvas.height = 96;
       const fhc = fhCanvas.getContext('2d')!;
-      fhc.fillStyle = '#000000';
-      fhc.fillRect(0, 0, 256, 64);
-      fhc.strokeStyle = '#ef4444';
-      fhc.lineWidth = 4;
-      fhc.strokeRect(2, 2, 252, 60);
-      fhc.fillStyle = '#ef4444';
-      fhc.font = 'bold 30px Courier New';
-      fhc.textAlign = 'center';
-      fhc.fillText("FAST HANDS", 128, 42);
-
+      const pgrad = fhc.createLinearGradient(0, 0, 0, 96);
+      pgrad.addColorStop(0, '#1a1410'); pgrad.addColorStop(1, '#0a0805');
+      fhc.fillStyle = pgrad; fhc.fillRect(0, 0, 256, 96);
+      fhc.strokeStyle = '#d4af37'; fhc.lineWidth = 3; fhc.strokeRect(4, 4, 248, 88);
+      fhc.fillStyle = '#ef4444'; fhc.font = 'bold 32px Georgia, serif'; fhc.textAlign = 'center';
+      fhc.fillText('FAST HANDS', 128, 44);
+      fhc.fillStyle = '#d4af37'; fhc.font = 'italic 16px Georgia, serif';
+      fhc.fillText('— swift reload —', 128, 72);
       const fhTex = new THREE.CanvasTexture(fhCanvas);
       const fhOverlay = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.78, 0.24),
-        new THREE.MeshBasicMaterial({ map: fhTex, side: THREE.DoubleSide })
+        new THREE.PlaneGeometry(0.7, 0.26),
+        new THREE.MeshBasicMaterial({ map: fhTex, side: THREE.DoubleSide, transparent: true })
       );
-      fhOverlay.position.set(0, 1.62, 0.385);
+      fhOverlay.position.set(0, 0.9, 0.4);
       pmGroup.add(fhOverlay);
 
-      const fhLight = new THREE.PointLight(0xef4444, 2.5, 4.5);
-      fhLight.position.set(0, 1.3, 0.5);
+      // Glowing crimson accent light beneath the angel + faint up-light on the marble
+      const fhLight = new THREE.PointLight(0xef4444, 2.6, 5.0);
+      fhLight.position.set(0, 1.9, 0.35);
       pmGroup.add(fhLight);
+      const baseGlow = new THREE.PointLight(0xffd27f, 1.2, 3.0);
+      baseGlow.position.set(0, 0.5, 0.4);
+      pmGroup.add(baseGlow);
 
       const px = perkMachineRef.current.position[0];
       const py = perkMachineRef.current.position[1];
@@ -1219,63 +1289,49 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     };
     buildPerkMachineMesh();
 
-    // --- PROCEDURAL MYSTERY BOX ---
+    // --- PROCEDURAL FORBIDDEN TOME (cursed book on a stone pedestal) ---
+    // The book itself IS the machine — it rests on a worn stone pedestal (no wooden crate).
     const buildMysteryBoxMesh = () => {
       const mbGroup = new THREE.Group();
 
-      const baseGeo = new THREE.BoxGeometry(1.9, 0.52, 0.85);
-      const chestMat = new THREE.MeshStandardMaterial({ color: 0x2d1b10, roughness: 0.95 }); // even darker weathered wood
-      const mbBase = new THREE.Mesh(baseGeo, chestMat);
-      mbBase.position.y = 0.52 / 2;
-      mbBase.castShadow = true;
-      mbBase.receiveShadow = true;
-      mbGroup.add(mbBase);
+      // Worn dark-stone pedestal texture
+      const stoneCanvas = document.createElement('canvas');
+      stoneCanvas.width = 256; stoneCanvas.height = 256;
+      const sc2 = stoneCanvas.getContext('2d')!;
+      const sgrad = sc2.createLinearGradient(0, 0, 0, 256);
+      sgrad.addColorStop(0, '#3a3530'); sgrad.addColorStop(1, '#211e1a');
+      sc2.fillStyle = sgrad; sc2.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 60; i++) {
+        sc2.fillStyle = `rgba(20,18,15,${0.05 + Math.random() * 0.12})`;
+        const r = 4 + Math.random() * 22;
+        sc2.beginPath(); sc2.arc(Math.random() * 256, Math.random() * 256, r, 0, Math.PI * 2); sc2.fill();
+      }
+      sc2.strokeStyle = 'rgba(10,9,7,0.5)'; sc2.lineWidth = 2;
+      for (let i = 0; i < 6; i++) { const y = Math.random() * 256; sc2.beginPath(); sc2.moveTo(0, y); sc2.lineTo(256, y + (Math.random() - 0.5) * 40); sc2.stroke(); }
+      const stoneTex = new THREE.CanvasTexture(stoneCanvas);
+      const pedestalMat = new THREE.MeshStandardMaterial({ map: stoneTex, color: 0x6b6358, roughness: 0.92, metalness: 0.05 });
+      const runicGoldMat = new THREE.MeshStandardMaterial({ color: 0x9c7441, roughness: 0.4, metalness: 0.8, emissive: 0x2a1d05, emissiveIntensity: 0.5 });
 
-      for (let ox of [-0.94, 0.94]) {
-        for (let oz of [-0.41, 0.41]) {
-          const corner = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.53, 0.06), blackMetalMaterial);
-          corner.position.set(ox, 0.52 / 2, oz);
-          mbGroup.add(corner);
-        }
+      // Stepped stone pedestal
+      const pedBottom = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 1.0), pedestalMat);
+      pedBottom.position.y = 0.1; pedBottom.castShadow = true; pedBottom.receiveShadow = true; mbGroup.add(pedBottom);
+      const pedShaft = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.7, 0.7), pedestalMat);
+      pedShaft.position.y = 0.55; pedShaft.castShadow = true; pedShaft.receiveShadow = true; mbGroup.add(pedShaft);
+      const pedTop = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.16, 0.9), pedestalMat);
+      pedTop.position.y = 0.98; pedTop.castShadow = true; pedTop.receiveShadow = true; mbGroup.add(pedTop);
+      // Glowing rune band around the pedestal shaft
+      for (const sx of [-0.42, 0.42]) {
+        const band = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.5, 0.62), runicGoldMat);
+        band.position.set(sx, 0.55, 0); mbGroup.add(band);
+      }
+      for (const sz of [-0.36, 0.36]) {
+        const band = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.5, 0.02), runicGoldMat);
+        band.position.set(0, 0.55, sz); mbGroup.add(band);
       }
 
-      // Lid Group representing the wooden crate's closed top surface
-      const lidGroup = new THREE.Group();
-      lidGroup.position.set(0, 0.52, -0.42);
-
-      const lidPlateGeo = new THREE.BoxGeometry(1.94, 0.14, 0.88);
-      const mbLid = new THREE.Mesh(lidPlateGeo, chestMat);
-      mbLid.position.set(0, 0.07, 0.42);
-      mbLid.castShadow = true;
-      lidGroup.add(mbLid);
-
-      // Question marks on front of crate
-      const qCanvas = document.createElement('canvas');
-      qCanvas.width = 128;
-      qCanvas.height = 128;
-      const qc = qCanvas.getContext('2d')!;
-      qc.fillStyle = 'rgba(0,0,0,0)';
-      qc.fillRect(0,0,128,128);
-      qc.fillStyle = '#10b981';
-      qc.font = 'bold 96px Arial';
-      qc.textAlign = 'center';
-      qc.fillText("?", 64, 96);
-
-      const qTex = new THREE.CanvasTexture(qCanvas);
-      const qMarkL = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.4), new THREE.MeshBasicMaterial({ map: qTex, transparent: true, side: THREE.DoubleSide }));
-      qMarkL.position.set(-0.45, 0.07, 0.85);
-      lidGroup.add(qMarkL);
-
-      const qMarkR = qMarkL.clone();
-      qMarkR.position.set(0.45, 0.07, 0.85);
-      lidGroup.add(qMarkR);
-
-      mbGroup.add(lidGroup);
-      mysteryBoxRef.current.lidGroup = lidGroup;
-
-      // --- PROCEDURAL ANCIENT COVENANT BOOK (MEMORABLE ARTIFACT) ---
+      // --- PROCEDURAL ANCIENT FORBIDDEN TOME (the machine itself) ---
       const bookGroup = new THREE.Group();
-      bookGroup.position.set(0, 0.66, 0.02); // top of closed crate lid
+      bookGroup.position.set(0, 1.12, 0); // resting on top of the pedestal
       bookGroup.rotation.y = -0.04; // slight off-axis alignment for visual charm
       mbGroup.add(bookGroup);
       mysteryBoxRef.current.bookGroup = bookGroup;
@@ -1476,13 +1532,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // --- WEAPON CONTAINER STAND & GLOW GROUP ---
       // Place the weapon glow/rise center directly in the book's center!
       const weaponGlowG = new THREE.Group();
-      weaponGlowG.position.set(0, 0.70, 0); // raised starting height inside open book pages
+      weaponGlowG.position.set(0, 1.16, 0); // starting height inside open book pages (on the pedestal)
       mbGroup.add(weaponGlowG);
       mysteryBoxRef.current.weaponGlowGroup = weaponGlowG;
 
       // Magical Point Light focused directly inside the center of the matching ancient text
       const bookGlow = new THREE.PointLight(0xeab308, 0, 5.0); // Gold initial glow light
-      bookGlow.position.set(0, 0.78, 0);
+      bookGlow.position.set(0, 1.24, 0);
       mbGroup.add(bookGlow);
       mysteryBoxRef.current.bookGlowLight = bookGlow;
 
@@ -1492,7 +1548,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       // --- MAGICAL PARTICLE SYSTEM FOR RITUAL ATMOSPHERE ---
       const particlesGroup = new THREE.Group();
-      particlesGroup.position.set(0, 0.72, 0);
+      particlesGroup.position.set(0, 1.18, 0);
       mbGroup.add(particlesGroup);
       mysteryBoxRef.current.particlesGroup = particlesGroup;
 
@@ -1525,7 +1581,25 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         particlesGroup.add(pMesh);
       }
 
-      // Casket Base box placement
+      // Floating "THE FORBIDDEN TOME" banner above the pedestal for clear visibility
+      const tomeSignCanvas = document.createElement('canvas');
+      tomeSignCanvas.width = 512; tomeSignCanvas.height = 128;
+      const tsc = tomeSignCanvas.getContext('2d')!;
+      tsc.fillStyle = 'rgba(8,4,4,0.85)'; tsc.fillRect(0, 0, 512, 128);
+      tsc.strokeStyle = '#9c2b2b'; tsc.lineWidth = 6; tsc.strokeRect(4, 4, 504, 120);
+      tsc.fillStyle = '#e0b048'; tsc.font = 'bold 40px Georgia, serif'; tsc.textAlign = 'center';
+      tsc.fillText('THE FORBIDDEN TOME', 256, 52);
+      tsc.fillStyle = '#cbb27a'; tsc.font = 'italic 24px Georgia, serif';
+      tsc.fillText('Press E — $950', 256, 96);
+      const tomeSignTex = new THREE.CanvasTexture(tomeSignCanvas);
+      const tomeSign = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.0, 0.5),
+        new THREE.MeshBasicMaterial({ map: tomeSignTex, side: THREE.DoubleSide, transparent: true })
+      );
+      tomeSign.position.set(0, 2.05, 0);
+      mbGroup.add(tomeSign);
+
+      // Pedestal placement against the east wall of the spawn classroom
       const bx = mysteryBoxRef.current.position[0];
       const by = mysteryBoxRef.current.position[1];
       const bz = mysteryBoxRef.current.position[2];
@@ -1727,21 +1801,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           maxAge: 0.6 + Math.random() * 0.4
         });
       }
-    };
-
-    // Dynamic obstacle mapping from map structures
-    // Add peripheral boundary bounds to avoid getting clipped outside classroom walls
-    const mapBoundingLimits = {
-      minX: -CLASSROOM_W / 2 + 0.65,
-      maxX: CLASSROOM_W / 2 - 0.65,
-      minZ: -CLASSROOM_D / 2 + 0.65,
-      maxZ: CLASSROOM_D / 2 - 0.65,
-      
-      // Hallway bounding box
-      hallMinX: 14.5,
-      hallMaxX: HALLWAY_X_CENTER + HALLWAY_W/2 - 0.65,
-      hallMinZ: -HALLWAY_D / 2 + 0.65,
-      hallMaxZ: HALLWAY_D / 2 - 0.65,
     };
 
     // --- EXPONENTIAL SHOTGUN WALL BUY SETUP ---
@@ -2078,7 +2137,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide, transparent: true })
       );
       buySignOverlay.position.set(0, height + 0.5, 0);
-      buySignOverlay.rotation.y = signRotateY;
+      // signRotateY is the desired world-space facing; subtract the group rotation so the
+      // banner keeps that facing regardless of how the door group itself is rotated.
+      buySignOverlay.rotation.y = signRotateY - rotationY;
       g.add(buySignOverlay);
       g.userData.sign = buySignOverlay;
 
@@ -2100,14 +2161,137 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       };
     };
 
-    const classroomExitDoor = buildBuyableDoor('door-classroom-exit', 1200, CLASSROOM_W / 2, 0, 0, 0.25, 2.8, 2.4, 0, 'EAST EXIT', -Math.PI / 2);
-    const doorHallwayNorth = buildBuyableDoor('door-hallway-north', 1000, 22.0, 0, -12.5, 0.25, 2.8, 1.5, 0, 'NORTH CLASSROOM', -Math.PI / 2);
-    const doorHallwaySouth = buildBuyableDoor('door-hallway-south', 1500, 22.0, 0, 12.5, 0.25, 2.8, 1.5, 0, 'SOUTH CLASSROOM', -Math.PI / 2);
+    // Doors sit in the vertical (Z-running) east walls of classroom 1 and the hallway.
+    // The door slab is modelled along its local X axis, so each door group is rotated
+    // -90° about Y to make the slab span the Z-axis doorway opening and sit flush in the
+    // wall plane. The collider box and swing/sink animation are all relative to the group,
+    // so they follow the rotation automatically.
+    const classroomExitDoor = buildBuyableDoor('door-classroom-exit', 1200, CLASSROOM_W / 2, 0, 0, 0.25, 2.8, 2.4, -Math.PI / 2, 'EAST EXIT', -Math.PI / 2);
+    const doorHallwayNorth = buildBuyableDoor('door-hallway-north', 1000, 22.0, 0, -12.5, 0.25, 2.8, 1.5, -Math.PI / 2, 'NORTH CLASSROOM', -Math.PI / 2);
+    const doorHallwaySouth = buildBuyableDoor('door-hallway-south', 1500, 22.0, 0, 12.5, 0.25, 2.8, 1.5, -Math.PI / 2, 'SOUTH CLASSROOM', -Math.PI / 2);
 
     const hallwayDoors = [classroomExitDoor, doorHallwayNorth, doorHallwaySouth];
 
-    // Register active door blocker collision
-    let doorBlockerBox = new THREE.Box3().setFromObject(classroomExitDoor.doorMesh!);
+    // --- UNIFIED WALL COLLISION SYSTEM ---
+    // Solid wall segments expressed as axis-aligned XZ rectangles. A segment whose
+    // `gate` door has been purchased becomes passable (the doorway opening). This single
+    // model is shared by the player, bots, and zombies so nobody clips through walls and
+    // everyone is funnelled through the actual door openings.
+    // `gate`: segment is solid until the door is purchased (then it becomes the opening).
+    // `closedGate`: segment is solid only while the door is NOT purchased (the closed door slab).
+    interface WallSeg { minX: number; maxX: number; minZ: number; maxZ: number; gate?: BuyableDoor; closedGate?: BuyableDoor; }
+    const HT = 0.25; // half wall thickness used for collider rectangles
+    const wallSegments: WallSeg[] = [
+      // Classroom 1 perimeter
+      { minX: -14 - HT, maxX: -14 + HT, minZ: -12, maxZ: 12 },             // West wall (solid)
+      { minX: -14, maxX: 14, minZ: -12 - HT, maxZ: -12 + HT },            // North wall
+      { minX: -14, maxX: 14, minZ: 12 - HT, maxZ: 12 + HT },              // South wall
+      // East wall of classroom 1 — permanent wall flanking the doorway opening (z in [-2,2])
+      { minX: 14 - HT, maxX: 14 + HT, minZ: -12, maxZ: -2 },
+      { minX: 14 - HT, maxX: 14 + HT, minZ: 2, maxZ: 12 },
+      // Exit-door slab fills the opening while locked; clears once purchased
+      { minX: 14 - HT, maxX: 14 + HT, minZ: -2, maxZ: 2, closedGate: classroomExitDoor },
+
+      // Hallway west-side cap walls (separate hallway ends from the void)
+      { minX: 14 - HT, maxX: 14 + HT, minZ: -25, maxZ: -12 },
+      { minX: 14 - HT, maxX: 14 + HT, minZ: 12, maxZ: 25 },
+      // Hallway end caps
+      { minX: 14, maxX: 22, minZ: -25 - HT, maxZ: -25 + HT },
+      { minX: 14, maxX: 22, minZ: 25 - HT, maxZ: 25 + HT },
+      // Hallway east wall — openings at z[-13.25,-11.75] (north door) & z[11.75,13.25] (south door)
+      { minX: 22 - HT, maxX: 22 + HT, minZ: -25, maxZ: -13.25 },
+      { minX: 22 - HT, maxX: 22 + HT, minZ: -11.75, maxZ: 11.75 },
+      { minX: 22 - HT, maxX: 22 + HT, minZ: 13.25, maxZ: 25 },
+      // Door slabs fill the openings while locked; clear once purchased
+      { minX: 22 - HT, maxX: 22 + HT, minZ: -13.25, maxZ: -11.75, closedGate: doorHallwayNorth },
+      { minX: 22 - HT, maxX: 22 + HT, minZ: 11.75, maxZ: 13.25, closedGate: doorHallwaySouth },
+
+      // Classroom 2 (north) perimeter — entered through north door, x in [22,38], z in [-21.5,-3.5]
+      { minX: 22, maxX: 38, minZ: -21.5 - HT, maxZ: -21.5 + HT },
+      { minX: 22, maxX: 38, minZ: -3.5 - HT, maxZ: -3.5 + HT },
+      { minX: 38 - HT, maxX: 38 + HT, minZ: -21.5, maxZ: -3.5 },
+
+      // Classroom 3 (south) perimeter — x in [22,38], z in [3.5,21.5]
+      { minX: 22, maxX: 38, minZ: 3.5 - HT, maxZ: 3.5 + HT },
+      { minX: 22, maxX: 38, minZ: 21.5 - HT, maxZ: 21.5 + HT },
+      { minX: 38 - HT, maxX: 38 + HT, minZ: 3.5, maxZ: 21.5 },
+    ];
+
+    // Resolve a circle (entity footprint) against all active wall segments by pushing it
+    // out along the axis of least penetration. Mutates the passed position vector in place.
+    const resolveWallCollisions = (pos: THREE.Vector3, radius: number) => {
+      for (const seg of wallSegments) {
+        if (seg.gate && seg.gate.purchased) continue;       // wall that opens up once bought
+        if (seg.closedGate && seg.closedGate.purchased) continue; // door slab clears once bought
+        // Closest point on the rectangle to the circle centre
+        const cx = Math.max(seg.minX, Math.min(seg.maxX, pos.x));
+        const cz = Math.max(seg.minZ, Math.min(seg.maxZ, pos.z));
+        const dx = pos.x - cx;
+        const dz = pos.z - cz;
+        const distSq = dx * dx + dz * dz;
+        if (distSq >= radius * radius) {
+          if (distSq > 0) continue; // outside and clear of this segment
+          // Centre is exactly on an edge with zero distance — fall through to penetration push
+        }
+        if (distSq > 0.000001) {
+          // Circle centre is outside the rectangle but overlapping: push straight out
+          const dist = Math.sqrt(distSq);
+          const push = radius - dist;
+          pos.x += (dx / dist) * push;
+          pos.z += (dz / dist) * push;
+        } else {
+          // Centre is inside the rectangle: eject along the nearest face
+          const toLeft = pos.x - seg.minX;
+          const toRight = seg.maxX - pos.x;
+          const toBack = pos.z - seg.minZ;
+          const toFront = seg.maxZ - pos.z;
+          const minPen = Math.min(toLeft, toRight, toBack, toFront);
+          if (minPen === toLeft) pos.x = seg.minX - radius;
+          else if (minPen === toRight) pos.x = seg.maxX + radius;
+          else if (minPen === toBack) pos.z = seg.minZ - radius;
+          else pos.z = seg.maxZ + radius;
+        }
+      }
+    };
+
+    // --- ROOM ROUTING FOR ZOMBIES ---
+    // Map regions and the doorway each zombie must reach to cross toward its target. This
+    // gives crude but reliable navigation: a zombie in a different room steers to the
+    // connecting doorway (only once the door is open) instead of grinding into a wall.
+    type RoomId = 'classroom1' | 'hallway' | 'classroom2' | 'classroom3';
+    const whichRoom = (x: number, z: number): RoomId => {
+      if (x < 14) return 'classroom1';
+      if (x < 22) return 'hallway';
+      return z < 0 ? 'classroom2' : 'classroom3';
+    };
+    // Doorway centre points (the gap the entity should aim for to pass between rooms).
+    const DOORWAY_EXIT = new THREE.Vector3(14, 0, 0);        // classroom1 <-> hallway
+    const DOORWAY_NORTH = new THREE.Vector3(22, 0, -12.5);   // hallway <-> classroom2
+    const DOORWAY_SOUTH = new THREE.Vector3(22, 0, 12.5);    // hallway <-> classroom3
+
+    // Returns the point a zombie should currently steer toward to make progress to target.
+    const computeSteerPoint = (from: THREE.Vector3, target: THREE.Vector3): THREE.Vector3 => {
+      const fromRoom = whichRoom(from.x, from.z);
+      const targetRoom = whichRoom(target.x, target.z);
+      if (fromRoom === targetRoom) return target;
+
+      // Route hop-by-hop toward the target room through open doorways.
+      switch (fromRoom) {
+        case 'classroom1':
+          return classroomExitDoor.purchased ? DOORWAY_EXIT : target;
+        case 'hallway':
+          if (targetRoom === 'classroom1') return classroomExitDoor.purchased ? DOORWAY_EXIT : target;
+          if (targetRoom === 'classroom2') return doorHallwayNorth.purchased ? DOORWAY_NORTH : target;
+          if (targetRoom === 'classroom3') return doorHallwaySouth.purchased ? DOORWAY_SOUTH : target;
+          return target;
+        case 'classroom2':
+          return doorHallwayNorth.purchased ? DOORWAY_NORTH : target;
+        case 'classroom3':
+          return doorHallwaySouth.purchased ? DOORWAY_SOUTH : target;
+        default:
+          return target;
+      }
+    };
 
     // --- PROCEDURAL TEAMMATES CHASSIS DESIGNER ---
     const designTeammateMesh = (clothesColor: number): THREE.Group => {
@@ -2734,7 +2918,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       sound.playReloadClick(0.85);
 
       const baseReloadTime = id === 'pistol' ? 1500 : (id === 'smg' ? 1800 : 2200);
-      const reloadTime = hasFastHands ? baseReloadTime / 2 : baseReloadTime;
+      const reloadTime = hasFastHandsRef.current ? baseReloadTime / 2 : baseReloadTime;
 
       setTimeout(() => {
         const needed = maxClip - stateRef.current.ammoClip;
@@ -2897,10 +3081,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         return;
       }
 
-      // 2c. Buy Fast Hands Perk Vending Soda
+      // 2c. Buy Fast Hands Perk Shrine
       const distanceToPerk = camera.position.distanceTo(new THREE.Vector3(...perkMachineRef.current.position));
-      if (distanceToPerk <= 2.45) {
-        if (!hasFastHands) {
+      if (distanceToPerk <= 2.8) {
+        if (!hasFastHandsRef.current) {
           const perkPrice = 2000;
           if (stateRef.current.points >= perkPrice) {
             setPoints(p => {
@@ -2918,7 +3102,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         return;
       }
 
-      // 2d. Interacting with the Mystery Box
+      // 2d. Interacting with the Forbidden Tome
       const distanceToMBox = camera.position.distanceTo(new THREE.Vector3(...mysteryBoxRef.current.position));
       if (distanceToMBox <= 2.85) {
         const mBox = mysteryBoxRef.current;
@@ -2929,7 +3113,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
               stateRef.current.points = next;
               return next;
             });
-            addScorePopup(-mBox.price, `-$950 Mystery Box`);
+            addScorePopup(-mBox.price, `-$950 Forbidden Tome`);
             
             // Set spin parameters
             mBox.state = 'spinning';
@@ -3823,7 +4007,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       const d = Math.min(clock.getDelta(), 0.1); // Clamp physics lag
       const time = clock.getElapsedTime();
 
-      // --- MYSTERY BOX TICK ANIMATION PASS ---
+      // --- FORBIDDEN TOME TICK ANIMATION PASS ---
       if (mysteryBoxRef.current.bookGroup) {
         const mBox = mysteryBoxRef.current;
         const bookGlow = mBox.bookGlowLight;
@@ -3871,6 +4055,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
               mBox.weaponGlowGroup.remove(mBox.weaponGlowGroup.children[0]);
             }
           }
+          // Reset the rise height so the next reveal animates from inside the book again
+          if (mBox.weaponGlowGroup) mBox.weaponGlowGroup.position.y = 1.16;
         } else if (mBox.state === 'spinning') {
           // Open the book! Progress grows to 1
           mBox.bookOpenProgress = Math.min(1.0, mBox.bookOpenProgress + d * 2.4);
@@ -3985,8 +4171,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           
           if (mBox.weaponGlowGroup) {
             mBox.weaponGlowGroup.rotation.y += d * 6;
-            // Rise selected weapon out from the center pages of the book
-            mBox.weaponGlowGroup.position.y = Math.min(1.25, mBox.weaponGlowGroup.position.y + d * 0.35);
+            // Rise selected weapon out from the center pages of the book (atop the pedestal)
+            mBox.weaponGlowGroup.position.y = Math.min(1.7, mBox.weaponGlowGroup.position.y + d * 0.35);
           }
         } else if (mBox.state === 'ready') {
           // Keep book open completely
@@ -4030,7 +4216,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           
           if (mBox.weaponGlowGroup) {
             mBox.weaponGlowGroup.rotation.y += d * 1.6;
-            mBox.weaponGlowGroup.position.y = 1.25 + Math.sin(time * 3.5) * 0.07;
+            mBox.weaponGlowGroup.position.y = 1.7 + Math.sin(time * 3.5) * 0.07;
           }
         }
       }
@@ -4173,14 +4359,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         triggerShootWeapon();
       }
 
-      // --- 1. PROPER WOODEN PANEL DOOR SWINGING ANIMATION ---
+      // --- 1. DOOR OPEN ANIMATION: swing slabs, then sink the frame into the floor ---
       for (const door of hallwayDoors) {
         if (door.purchased) {
           // Hide purchase floating sign once purchased
           if (door.group.userData && door.group.userData.sign) {
             door.group.userData.sign.visible = false;
           }
-          
+
+          let swungOpen = true;
           if (door.group.userData && door.group.userData.isDouble) {
             const targetRotL = Math.PI * 0.65;
             const targetRotR = -Math.PI * 0.65;
@@ -4189,15 +4376,30 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
             if (lSlab && lSlab.rotation.y < targetRotL) {
               lSlab.rotation.y = Math.min(targetRotL, lSlab.rotation.y + d * 3.5);
+              swungOpen = false;
             }
             if (rSlab && rSlab.rotation.y > targetRotR) {
               rSlab.rotation.y = Math.max(targetRotR, rSlab.rotation.y - d * 3.5);
+              swungOpen = false;
             }
           } else if (door.group.userData && door.group.userData.panelGroup) {
             const targetRot = Math.PI * 0.65;
             const pSlab = door.group.userData.panelGroup;
             if (pSlab.rotation.y < targetRot) {
               pSlab.rotation.y = Math.min(targetRot, pSlab.rotation.y + d * 3.5);
+              swungOpen = false;
+            }
+          }
+
+          // After swinging fully open, sink the entire door frame down into the floor so
+          // the doorway is left completely clear. sinkOffset (set to 0.01 on purchase)
+          // grows toward the door height, dropping the group below floor level.
+          if (swungOpen && door.sinkOffset > 0) {
+            const sinkTarget = door.height + 0.3;
+            door.sinkOffset = Math.min(sinkTarget, door.sinkOffset + d * 1.8);
+            door.group.position.y = door.position[1] - door.sinkOffset;
+            if (door.sinkOffset >= sinkTarget) {
+              door.group.visible = false; // fully sunk: remove from view
             }
           }
         }
@@ -4321,59 +4523,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       camera.position.z += pVelocity.z * d;
 
       // --- 4. MAP COLLISION DECISION SOLVER ---
-      // Hard bounds limits to avoid getting out of maps
-      const limit = mapBoundingLimits;
-      
-      if (classroomExitDoor.purchased) {
-        // Classroom + Door transitional zone + Hallway zone form ONE single connected playable space!
-        // Rebuilt the collision boundaries cleanly to remove any invisible walls and teleport logic.
-        const inClassroom1 = camera.position.x <= 13.2;
-        const inClassroom2 = camera.position.x >= 22.0 && camera.position.z < 0;
-        const inClassroom3 = camera.position.x >= 22.0 && camera.position.z > 0;
-        const inHallway = camera.position.x > 13.2 && camera.position.x < 22.0;
-        
-        if (inClassroom1) {
-          camera.position.x = Math.max(limit.minX, camera.position.x);
-          camera.position.z = Math.max(limit.minZ, Math.min(limit.maxZ, camera.position.z));
-        } else if (inClassroom2) {
-          if (doorHallwayNorth.purchased) {
-            camera.position.x = Math.min(37.35, camera.position.x);
-            camera.position.z = Math.max(-21.35, Math.min(-3.65, camera.position.z));
-          } else {
-            camera.position.x = 21.35;
-          }
-        } else if (inClassroom3) {
-          if (doorHallwaySouth.purchased) {
-            camera.position.x = Math.min(37.35, camera.position.x);
-            camera.position.z = Math.max(3.65, Math.min(21.35, camera.position.z));
-          } else {
-            camera.position.x = 21.35;
-          }
-        } else {
-          // Transitional hallway zones
-          // Block going through North door if locked
-          if (camera.position.z < 0) {
-            if (!doorHallwayNorth.purchased && camera.position.x > 21.35) {
-              camera.position.x = 21.35;
-            }
-          } else {
-            // Block going through South door if locked
-            if (!doorHallwaySouth.purchased && camera.position.x > 21.35) {
-              camera.position.x = 21.35;
-            }
-          }
-          camera.position.z = Math.max(-24.35, Math.min(24.35, camera.position.z));
-        }
-      } else {
-        // Locked inside main classroom bounds
-        camera.position.x = Math.max(limit.minX, Math.min(limit.maxX, camera.position.x));
-        camera.position.z = Math.max(limit.minZ, Math.min(limit.maxZ, camera.position.z));
-
-        // Prevent walking past exit door threshold if locked
-        if (camera.position.x > 13.15) {
-          camera.position.x = 13.15;
-        }
-      }
+      // Walls (including locked doors) are resolved by the unified segment collider, which
+      // funnels the player through real door openings instead of brittle invisible-wall zones.
+      resolveWallCollisions(camera.position, 0.45);
 
       // Check simple radial collisions with student tables
       classroomObstacles.forEach(obs => {
@@ -4496,13 +4648,19 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             });
           }
 
-          const dirToTarget = new THREE.Vector3().subVectors(targetPos, z.mesh.position);
+          // Distance to the actual target (used for attack range / proximity checks)
+          const toTargetFlat = new THREE.Vector3().subVectors(targetPos, z.mesh.position);
+          toTargetFlat.y = 0;
+          const distanceXY = toTargetFlat.length();
+
+          // Steering goal: route through open doorways when the target is in another room
+          const steerPoint = computeSteerPoint(z.mesh.position, targetPos);
+          const dirToTarget = new THREE.Vector3().subVectors(steerPoint, z.mesh.position);
           dirToTarget.y = 0; // lock vector on floor plane
-          const distanceXY = dirToTarget.length();
           dirToTarget.normalize();
 
-          // Smooth rotation looking at their target
-          z.mesh.lookAt(new THREE.Vector3(targetPos.x, 0.0, targetPos.z));
+          // Smooth rotation looking at where it is walking
+          z.mesh.lookAt(new THREE.Vector3(steerPoint.x, 0.0, steerPoint.z));
 
           if (distanceXY > 1.1) {
             z.mesh.position.addScaledVector(dirToTarget, z.speed * d);
@@ -4622,31 +4780,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             }
           });
 
-          // Locked exit door boundary collisions for zombies
-          if (!classroomExitDoor.purchased && z.mesh.position.x > 13.15) {
-            z.mesh.position.x = 13.15;
-          }
-
-          // Locked corridor walls / classroom entrance constraints for zombies
-          if (z.mesh.position.x >= 21.35) {
-            if (z.mesh.position.z < 0) { // Classroom 2 range
-              if (!doorHallwayNorth.purchased) {
-                z.mesh.position.x = 21.35;
-              } else {
-                // Inside Classroom 2, keep within bounds
-                z.mesh.position.x = Math.min(37.35, z.mesh.position.x);
-                z.mesh.position.z = Math.max(-21.35, Math.min(-3.65, z.mesh.position.z));
-              }
-            } else { // Classroom 3 range
-              if (!doorHallwaySouth.purchased) {
-                z.mesh.position.x = 21.35;
-              } else {
-                // Inside Classroom 3, keep within bounds
-                z.mesh.position.x = Math.min(37.35, z.mesh.position.x);
-                z.mesh.position.z = Math.max(3.65, Math.min(21.35, z.mesh.position.z));
-              }
-            }
-          }
+          // Walls & locked doors block zombies via the shared segment collider, so they
+          // can only cross between rooms through opened doorways.
+          resolveWallCollisions(z.mesh.position, 0.4);
 
           // --- ZOMBIE-TO-ZOMBIE CO-ACCELERATION RESOLVER ---
           activeZombiesList.forEach(otherZ => {
@@ -4900,14 +5036,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                  }
               }
             } else {
-              // Idle follow player to regroup
+              // Idle follow player to regroup, routing through open doorways
               const dToPlayer = tm.mesh.position.distanceTo(camera.position);
               if (dToPlayer > 5.5) {
-                const approachDir = new THREE.Vector3().subVectors(camera.position, tm.mesh.position);
+                const botSteer = computeSteerPoint(tm.mesh.position, camera.position);
+                const approachDir = new THREE.Vector3().subVectors(botSteer, tm.mesh.position);
                 approachDir.y = 0;
                 approachDir.normalize();
                 tm.mesh.position.addScaledVector(approachDir, 2.3 * d);
-                tm.mesh.lookAt(new THREE.Vector3(camera.position.x, tm.mesh.position.y, camera.position.z));
+                tm.mesh.lookAt(new THREE.Vector3(botSteer.x, tm.mesh.position.y, botSteer.z));
 
                 const wSway = Math.sin(time * 5.5);
                 tm.mesh.children[3].rotation.x = wSway * 0.22;
@@ -4916,51 +5053,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             }
           }
 
-          // Enforce maps hard physical constraints bounds on AI bots
-          const limit = mapBoundingLimits;
-          if (classroomExitDoor.purchased) {
-            const inClassroom1 = tm.mesh.position.x <= 13.2;
-            const inClassroom2 = tm.mesh.position.x >= 22.0 && tm.mesh.position.z < 0;
-            const inClassroom3 = tm.mesh.position.x >= 22.0 && tm.mesh.position.z > 0;
-            const inHallway = tm.mesh.position.x > 13.2 && tm.mesh.position.x < 22.0;
-
-            if (inClassroom1) {
-              tm.mesh.position.x = Math.max(limit.minX, tm.mesh.position.x);
-              tm.mesh.position.z = Math.max(limit.minZ, Math.min(limit.maxZ, tm.mesh.position.z));
-            } else if (inClassroom2) {
-              if (doorHallwayNorth.purchased) {
-                tm.mesh.position.x = Math.min(37.35, tm.mesh.position.x);
-                tm.mesh.position.z = Math.max(-21.35, Math.min(-3.65, tm.mesh.position.z));
-              } else {
-                tm.mesh.position.x = 21.35;
-              }
-            } else if (inClassroom3) {
-              if (doorHallwaySouth.purchased) {
-                tm.mesh.position.x = Math.min(37.35, tm.mesh.position.x);
-                tm.mesh.position.z = Math.max(3.65, Math.min(21.35, tm.mesh.position.z));
-              } else {
-                tm.mesh.position.x = 21.35;
-              }
-            } else {
-              // Teammate is in the Hallway (x spans from 13.2 to 22.0)
-              if (tm.mesh.position.z < 0) {
-                if (!doorHallwayNorth.purchased && tm.mesh.position.x > 21.35) {
-                  tm.mesh.position.x = 21.35;
-                }
-              } else {
-                if (!doorHallwaySouth.purchased && tm.mesh.position.x > 21.35) {
-                  tm.mesh.position.x = 21.35;
-                }
-              }
-              tm.mesh.position.z = Math.max(-24.35, Math.min(24.35, tm.mesh.position.z));
-            }
-          } else {
-            tm.mesh.position.x = Math.max(limit.minX, Math.min(limit.maxX, tm.mesh.position.x));
-            tm.mesh.position.z = Math.max(limit.minZ, Math.min(limit.maxZ, tm.mesh.position.z));
-            if (tm.mesh.position.x > 13.15) {
-              tm.mesh.position.x = 13.15;
-            }
-          }
+          // Walls & locked doors block AI bots via the shared segment collider.
+          resolveWallCollisions(tm.mesh.position, 0.4);
 
           // Desk boundaries collisions for AI bots
           classroomObstacles.forEach(obs => {
@@ -5034,8 +5128,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           } else {
             matchLabel = `BUY MP5 SMG [E]\nPRICE: $1000`;
           }
-        } else if (camera.position.distanceTo(new THREE.Vector3(...perkMachineRef.current.position)) <= 2.4) {
-          if (!hasFastHands) {
+        } else if (camera.position.distanceTo(new THREE.Vector3(...perkMachineRef.current.position)) <= 2.8) {
+          if (!hasFastHandsRef.current) {
             matchLabel = `BUY FAST HANDS PERK [E]\nPRICE: $2000`;
           } else {
             matchLabel = `FAST HANDS PERK OWNED_`;
@@ -5043,9 +5137,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         } else if (camera.position.distanceTo(new THREE.Vector3(...mysteryBoxRef.current.position)) <= 2.85) {
           const mBox = mysteryBoxRef.current;
           if (mBox.state === 'idle') {
-            matchLabel = `ACCESS MYSTERY BOX [E]\nPRICE: $950`;
+            matchLabel = `OPEN THE FORBIDDEN TOME [E]\nPRICE: $950`;
           } else if (mBox.state === 'spinning') {
-            matchLabel = `MYSTERY BOX SPINNING_`;
+            matchLabel = `THE FORBIDDEN TOME STIRS_`;
           } else if (mBox.state === 'ready') {
             const names: Record<string, string> = {
               pistol: 'M1911 Pistol',
