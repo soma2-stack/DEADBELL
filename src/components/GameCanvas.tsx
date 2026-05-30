@@ -1729,21 +1729,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
     };
 
-    // Dynamic obstacle mapping from map structures
-    // Add peripheral boundary bounds to avoid getting clipped outside classroom walls
-    const mapBoundingLimits = {
-      minX: -CLASSROOM_W / 2 + 0.65,
-      maxX: CLASSROOM_W / 2 - 0.65,
-      minZ: -CLASSROOM_D / 2 + 0.65,
-      maxZ: CLASSROOM_D / 2 - 0.65,
-      
-      // Hallway bounding box
-      hallMinX: 14.5,
-      hallMaxX: HALLWAY_X_CENTER + HALLWAY_W/2 - 0.65,
-      hallMinZ: -HALLWAY_D / 2 + 0.65,
-      hallMaxZ: HALLWAY_D / 2 - 0.65,
-    };
-
     // --- EXPONENTIAL SHOTGUN WALL BUY SETUP ---
     const addShotgunWallbuy = (): WallBuy => {
       const g = new THREE.Group();
@@ -2106,8 +2091,126 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     const hallwayDoors = [classroomExitDoor, doorHallwayNorth, doorHallwaySouth];
 
-    // Register active door blocker collision
-    let doorBlockerBox = new THREE.Box3().setFromObject(classroomExitDoor.doorMesh!);
+    // --- UNIFIED WALL COLLISION SYSTEM ---
+    // Solid wall segments expressed as axis-aligned XZ rectangles. A segment whose
+    // `gate` door has been purchased becomes passable (the doorway opening). This single
+    // model is shared by the player, bots, and zombies so nobody clips through walls and
+    // everyone is funnelled through the actual door openings.
+    // `gate`: segment is solid until the door is purchased (then it becomes the opening).
+    // `closedGate`: segment is solid only while the door is NOT purchased (the closed door slab).
+    interface WallSeg { minX: number; maxX: number; minZ: number; maxZ: number; gate?: BuyableDoor; closedGate?: BuyableDoor; }
+    const HT = 0.25; // half wall thickness used for collider rectangles
+    const wallSegments: WallSeg[] = [
+      // Classroom 1 perimeter
+      { minX: -14 - HT, maxX: -14 + HT, minZ: -12, maxZ: 12 },             // West wall (solid)
+      { minX: -14, maxX: 14, minZ: -12 - HT, maxZ: -12 + HT },            // North wall
+      { minX: -14, maxX: 14, minZ: 12 - HT, maxZ: 12 + HT },              // South wall
+      // East wall of classroom 1 — permanent wall flanking the doorway opening (z in [-2,2])
+      { minX: 14 - HT, maxX: 14 + HT, minZ: -12, maxZ: -2 },
+      { minX: 14 - HT, maxX: 14 + HT, minZ: 2, maxZ: 12 },
+      // Exit-door slab fills the opening while locked; clears once purchased
+      { minX: 14 - HT, maxX: 14 + HT, minZ: -2, maxZ: 2, closedGate: classroomExitDoor },
+
+      // Hallway west-side cap walls (separate hallway ends from the void)
+      { minX: 14 - HT, maxX: 14 + HT, minZ: -25, maxZ: -12 },
+      { minX: 14 - HT, maxX: 14 + HT, minZ: 12, maxZ: 25 },
+      // Hallway end caps
+      { minX: 14, maxX: 22, minZ: -25 - HT, maxZ: -25 + HT },
+      { minX: 14, maxX: 22, minZ: 25 - HT, maxZ: 25 + HT },
+      // Hallway east wall — openings at z[-13.25,-11.75] (north door) & z[11.75,13.25] (south door)
+      { minX: 22 - HT, maxX: 22 + HT, minZ: -25, maxZ: -13.25 },
+      { minX: 22 - HT, maxX: 22 + HT, minZ: -11.75, maxZ: 11.75 },
+      { minX: 22 - HT, maxX: 22 + HT, minZ: 13.25, maxZ: 25 },
+      // Door slabs fill the openings while locked; clear once purchased
+      { minX: 22 - HT, maxX: 22 + HT, minZ: -13.25, maxZ: -11.75, closedGate: doorHallwayNorth },
+      { minX: 22 - HT, maxX: 22 + HT, minZ: 11.75, maxZ: 13.25, closedGate: doorHallwaySouth },
+
+      // Classroom 2 (north) perimeter — entered through north door, x in [22,38], z in [-21.5,-3.5]
+      { minX: 22, maxX: 38, minZ: -21.5 - HT, maxZ: -21.5 + HT },
+      { minX: 22, maxX: 38, minZ: -3.5 - HT, maxZ: -3.5 + HT },
+      { minX: 38 - HT, maxX: 38 + HT, minZ: -21.5, maxZ: -3.5 },
+
+      // Classroom 3 (south) perimeter — x in [22,38], z in [3.5,21.5]
+      { minX: 22, maxX: 38, minZ: 3.5 - HT, maxZ: 3.5 + HT },
+      { minX: 22, maxX: 38, minZ: 21.5 - HT, maxZ: 21.5 + HT },
+      { minX: 38 - HT, maxX: 38 + HT, minZ: 3.5, maxZ: 21.5 },
+    ];
+
+    // Resolve a circle (entity footprint) against all active wall segments by pushing it
+    // out along the axis of least penetration. Mutates the passed position vector in place.
+    const resolveWallCollisions = (pos: THREE.Vector3, radius: number) => {
+      for (const seg of wallSegments) {
+        if (seg.gate && seg.gate.purchased) continue;       // wall that opens up once bought
+        if (seg.closedGate && seg.closedGate.purchased) continue; // door slab clears once bought
+        // Closest point on the rectangle to the circle centre
+        const cx = Math.max(seg.minX, Math.min(seg.maxX, pos.x));
+        const cz = Math.max(seg.minZ, Math.min(seg.maxZ, pos.z));
+        const dx = pos.x - cx;
+        const dz = pos.z - cz;
+        const distSq = dx * dx + dz * dz;
+        if (distSq >= radius * radius) {
+          if (distSq > 0) continue; // outside and clear of this segment
+          // Centre is exactly on an edge with zero distance — fall through to penetration push
+        }
+        if (distSq > 0.000001) {
+          // Circle centre is outside the rectangle but overlapping: push straight out
+          const dist = Math.sqrt(distSq);
+          const push = radius - dist;
+          pos.x += (dx / dist) * push;
+          pos.z += (dz / dist) * push;
+        } else {
+          // Centre is inside the rectangle: eject along the nearest face
+          const toLeft = pos.x - seg.minX;
+          const toRight = seg.maxX - pos.x;
+          const toBack = pos.z - seg.minZ;
+          const toFront = seg.maxZ - pos.z;
+          const minPen = Math.min(toLeft, toRight, toBack, toFront);
+          if (minPen === toLeft) pos.x = seg.minX - radius;
+          else if (minPen === toRight) pos.x = seg.maxX + radius;
+          else if (minPen === toBack) pos.z = seg.minZ - radius;
+          else pos.z = seg.maxZ + radius;
+        }
+      }
+    };
+
+    // --- ROOM ROUTING FOR ZOMBIES ---
+    // Map regions and the doorway each zombie must reach to cross toward its target. This
+    // gives crude but reliable navigation: a zombie in a different room steers to the
+    // connecting doorway (only once the door is open) instead of grinding into a wall.
+    type RoomId = 'classroom1' | 'hallway' | 'classroom2' | 'classroom3';
+    const whichRoom = (x: number, z: number): RoomId => {
+      if (x < 14) return 'classroom1';
+      if (x < 22) return 'hallway';
+      return z < 0 ? 'classroom2' : 'classroom3';
+    };
+    // Doorway centre points (the gap the entity should aim for to pass between rooms).
+    const DOORWAY_EXIT = new THREE.Vector3(14, 0, 0);        // classroom1 <-> hallway
+    const DOORWAY_NORTH = new THREE.Vector3(22, 0, -12.5);   // hallway <-> classroom2
+    const DOORWAY_SOUTH = new THREE.Vector3(22, 0, 12.5);    // hallway <-> classroom3
+
+    // Returns the point a zombie should currently steer toward to make progress to target.
+    const computeSteerPoint = (from: THREE.Vector3, target: THREE.Vector3): THREE.Vector3 => {
+      const fromRoom = whichRoom(from.x, from.z);
+      const targetRoom = whichRoom(target.x, target.z);
+      if (fromRoom === targetRoom) return target;
+
+      // Route hop-by-hop toward the target room through open doorways.
+      switch (fromRoom) {
+        case 'classroom1':
+          return classroomExitDoor.purchased ? DOORWAY_EXIT : target;
+        case 'hallway':
+          if (targetRoom === 'classroom1') return classroomExitDoor.purchased ? DOORWAY_EXIT : target;
+          if (targetRoom === 'classroom2') return doorHallwayNorth.purchased ? DOORWAY_NORTH : target;
+          if (targetRoom === 'classroom3') return doorHallwaySouth.purchased ? DOORWAY_SOUTH : target;
+          return target;
+        case 'classroom2':
+          return doorHallwayNorth.purchased ? DOORWAY_NORTH : target;
+        case 'classroom3':
+          return doorHallwaySouth.purchased ? DOORWAY_SOUTH : target;
+        default:
+          return target;
+      }
+    };
 
     // --- PROCEDURAL TEAMMATES CHASSIS DESIGNER ---
     const designTeammateMesh = (clothesColor: number): THREE.Group => {
@@ -4173,14 +4276,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         triggerShootWeapon();
       }
 
-      // --- 1. PROPER WOODEN PANEL DOOR SWINGING ANIMATION ---
+      // --- 1. DOOR OPEN ANIMATION: swing slabs, then sink the frame into the floor ---
       for (const door of hallwayDoors) {
         if (door.purchased) {
           // Hide purchase floating sign once purchased
           if (door.group.userData && door.group.userData.sign) {
             door.group.userData.sign.visible = false;
           }
-          
+
+          let swungOpen = true;
           if (door.group.userData && door.group.userData.isDouble) {
             const targetRotL = Math.PI * 0.65;
             const targetRotR = -Math.PI * 0.65;
@@ -4189,15 +4293,30 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
             if (lSlab && lSlab.rotation.y < targetRotL) {
               lSlab.rotation.y = Math.min(targetRotL, lSlab.rotation.y + d * 3.5);
+              swungOpen = false;
             }
             if (rSlab && rSlab.rotation.y > targetRotR) {
               rSlab.rotation.y = Math.max(targetRotR, rSlab.rotation.y - d * 3.5);
+              swungOpen = false;
             }
           } else if (door.group.userData && door.group.userData.panelGroup) {
             const targetRot = Math.PI * 0.65;
             const pSlab = door.group.userData.panelGroup;
             if (pSlab.rotation.y < targetRot) {
               pSlab.rotation.y = Math.min(targetRot, pSlab.rotation.y + d * 3.5);
+              swungOpen = false;
+            }
+          }
+
+          // After swinging fully open, sink the entire door frame down into the floor so
+          // the doorway is left completely clear. sinkOffset (set to 0.01 on purchase)
+          // grows toward the door height, dropping the group below floor level.
+          if (swungOpen && door.sinkOffset > 0) {
+            const sinkTarget = door.height + 0.3;
+            door.sinkOffset = Math.min(sinkTarget, door.sinkOffset + d * 1.8);
+            door.group.position.y = door.position[1] - door.sinkOffset;
+            if (door.sinkOffset >= sinkTarget) {
+              door.group.visible = false; // fully sunk: remove from view
             }
           }
         }
@@ -4321,59 +4440,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       camera.position.z += pVelocity.z * d;
 
       // --- 4. MAP COLLISION DECISION SOLVER ---
-      // Hard bounds limits to avoid getting out of maps
-      const limit = mapBoundingLimits;
-      
-      if (classroomExitDoor.purchased) {
-        // Classroom + Door transitional zone + Hallway zone form ONE single connected playable space!
-        // Rebuilt the collision boundaries cleanly to remove any invisible walls and teleport logic.
-        const inClassroom1 = camera.position.x <= 13.2;
-        const inClassroom2 = camera.position.x >= 22.0 && camera.position.z < 0;
-        const inClassroom3 = camera.position.x >= 22.0 && camera.position.z > 0;
-        const inHallway = camera.position.x > 13.2 && camera.position.x < 22.0;
-        
-        if (inClassroom1) {
-          camera.position.x = Math.max(limit.minX, camera.position.x);
-          camera.position.z = Math.max(limit.minZ, Math.min(limit.maxZ, camera.position.z));
-        } else if (inClassroom2) {
-          if (doorHallwayNorth.purchased) {
-            camera.position.x = Math.min(37.35, camera.position.x);
-            camera.position.z = Math.max(-21.35, Math.min(-3.65, camera.position.z));
-          } else {
-            camera.position.x = 21.35;
-          }
-        } else if (inClassroom3) {
-          if (doorHallwaySouth.purchased) {
-            camera.position.x = Math.min(37.35, camera.position.x);
-            camera.position.z = Math.max(3.65, Math.min(21.35, camera.position.z));
-          } else {
-            camera.position.x = 21.35;
-          }
-        } else {
-          // Transitional hallway zones
-          // Block going through North door if locked
-          if (camera.position.z < 0) {
-            if (!doorHallwayNorth.purchased && camera.position.x > 21.35) {
-              camera.position.x = 21.35;
-            }
-          } else {
-            // Block going through South door if locked
-            if (!doorHallwaySouth.purchased && camera.position.x > 21.35) {
-              camera.position.x = 21.35;
-            }
-          }
-          camera.position.z = Math.max(-24.35, Math.min(24.35, camera.position.z));
-        }
-      } else {
-        // Locked inside main classroom bounds
-        camera.position.x = Math.max(limit.minX, Math.min(limit.maxX, camera.position.x));
-        camera.position.z = Math.max(limit.minZ, Math.min(limit.maxZ, camera.position.z));
-
-        // Prevent walking past exit door threshold if locked
-        if (camera.position.x > 13.15) {
-          camera.position.x = 13.15;
-        }
-      }
+      // Walls (including locked doors) are resolved by the unified segment collider, which
+      // funnels the player through real door openings instead of brittle invisible-wall zones.
+      resolveWallCollisions(camera.position, 0.45);
 
       // Check simple radial collisions with student tables
       classroomObstacles.forEach(obs => {
@@ -4496,13 +4565,19 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             });
           }
 
-          const dirToTarget = new THREE.Vector3().subVectors(targetPos, z.mesh.position);
+          // Distance to the actual target (used for attack range / proximity checks)
+          const toTargetFlat = new THREE.Vector3().subVectors(targetPos, z.mesh.position);
+          toTargetFlat.y = 0;
+          const distanceXY = toTargetFlat.length();
+
+          // Steering goal: route through open doorways when the target is in another room
+          const steerPoint = computeSteerPoint(z.mesh.position, targetPos);
+          const dirToTarget = new THREE.Vector3().subVectors(steerPoint, z.mesh.position);
           dirToTarget.y = 0; // lock vector on floor plane
-          const distanceXY = dirToTarget.length();
           dirToTarget.normalize();
 
-          // Smooth rotation looking at their target
-          z.mesh.lookAt(new THREE.Vector3(targetPos.x, 0.0, targetPos.z));
+          // Smooth rotation looking at where it is walking
+          z.mesh.lookAt(new THREE.Vector3(steerPoint.x, 0.0, steerPoint.z));
 
           if (distanceXY > 1.1) {
             z.mesh.position.addScaledVector(dirToTarget, z.speed * d);
@@ -4622,31 +4697,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             }
           });
 
-          // Locked exit door boundary collisions for zombies
-          if (!classroomExitDoor.purchased && z.mesh.position.x > 13.15) {
-            z.mesh.position.x = 13.15;
-          }
-
-          // Locked corridor walls / classroom entrance constraints for zombies
-          if (z.mesh.position.x >= 21.35) {
-            if (z.mesh.position.z < 0) { // Classroom 2 range
-              if (!doorHallwayNorth.purchased) {
-                z.mesh.position.x = 21.35;
-              } else {
-                // Inside Classroom 2, keep within bounds
-                z.mesh.position.x = Math.min(37.35, z.mesh.position.x);
-                z.mesh.position.z = Math.max(-21.35, Math.min(-3.65, z.mesh.position.z));
-              }
-            } else { // Classroom 3 range
-              if (!doorHallwaySouth.purchased) {
-                z.mesh.position.x = 21.35;
-              } else {
-                // Inside Classroom 3, keep within bounds
-                z.mesh.position.x = Math.min(37.35, z.mesh.position.x);
-                z.mesh.position.z = Math.max(3.65, Math.min(21.35, z.mesh.position.z));
-              }
-            }
-          }
+          // Walls & locked doors block zombies via the shared segment collider, so they
+          // can only cross between rooms through opened doorways.
+          resolveWallCollisions(z.mesh.position, 0.4);
 
           // --- ZOMBIE-TO-ZOMBIE CO-ACCELERATION RESOLVER ---
           activeZombiesList.forEach(otherZ => {
@@ -4900,14 +4953,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                  }
               }
             } else {
-              // Idle follow player to regroup
+              // Idle follow player to regroup, routing through open doorways
               const dToPlayer = tm.mesh.position.distanceTo(camera.position);
               if (dToPlayer > 5.5) {
-                const approachDir = new THREE.Vector3().subVectors(camera.position, tm.mesh.position);
+                const botSteer = computeSteerPoint(tm.mesh.position, camera.position);
+                const approachDir = new THREE.Vector3().subVectors(botSteer, tm.mesh.position);
                 approachDir.y = 0;
                 approachDir.normalize();
                 tm.mesh.position.addScaledVector(approachDir, 2.3 * d);
-                tm.mesh.lookAt(new THREE.Vector3(camera.position.x, tm.mesh.position.y, camera.position.z));
+                tm.mesh.lookAt(new THREE.Vector3(botSteer.x, tm.mesh.position.y, botSteer.z));
 
                 const wSway = Math.sin(time * 5.5);
                 tm.mesh.children[3].rotation.x = wSway * 0.22;
@@ -4916,51 +4970,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             }
           }
 
-          // Enforce maps hard physical constraints bounds on AI bots
-          const limit = mapBoundingLimits;
-          if (classroomExitDoor.purchased) {
-            const inClassroom1 = tm.mesh.position.x <= 13.2;
-            const inClassroom2 = tm.mesh.position.x >= 22.0 && tm.mesh.position.z < 0;
-            const inClassroom3 = tm.mesh.position.x >= 22.0 && tm.mesh.position.z > 0;
-            const inHallway = tm.mesh.position.x > 13.2 && tm.mesh.position.x < 22.0;
-
-            if (inClassroom1) {
-              tm.mesh.position.x = Math.max(limit.minX, tm.mesh.position.x);
-              tm.mesh.position.z = Math.max(limit.minZ, Math.min(limit.maxZ, tm.mesh.position.z));
-            } else if (inClassroom2) {
-              if (doorHallwayNorth.purchased) {
-                tm.mesh.position.x = Math.min(37.35, tm.mesh.position.x);
-                tm.mesh.position.z = Math.max(-21.35, Math.min(-3.65, tm.mesh.position.z));
-              } else {
-                tm.mesh.position.x = 21.35;
-              }
-            } else if (inClassroom3) {
-              if (doorHallwaySouth.purchased) {
-                tm.mesh.position.x = Math.min(37.35, tm.mesh.position.x);
-                tm.mesh.position.z = Math.max(3.65, Math.min(21.35, tm.mesh.position.z));
-              } else {
-                tm.mesh.position.x = 21.35;
-              }
-            } else {
-              // Teammate is in the Hallway (x spans from 13.2 to 22.0)
-              if (tm.mesh.position.z < 0) {
-                if (!doorHallwayNorth.purchased && tm.mesh.position.x > 21.35) {
-                  tm.mesh.position.x = 21.35;
-                }
-              } else {
-                if (!doorHallwaySouth.purchased && tm.mesh.position.x > 21.35) {
-                  tm.mesh.position.x = 21.35;
-                }
-              }
-              tm.mesh.position.z = Math.max(-24.35, Math.min(24.35, tm.mesh.position.z));
-            }
-          } else {
-            tm.mesh.position.x = Math.max(limit.minX, Math.min(limit.maxX, tm.mesh.position.x));
-            tm.mesh.position.z = Math.max(limit.minZ, Math.min(limit.maxZ, tm.mesh.position.z));
-            if (tm.mesh.position.x > 13.15) {
-              tm.mesh.position.x = 13.15;
-            }
-          }
+          // Walls & locked doors block AI bots via the shared segment collider.
+          resolveWallCollisions(tm.mesh.position, 0.4);
 
           // Desk boundaries collisions for AI bots
           classroomObstacles.forEach(obs => {
