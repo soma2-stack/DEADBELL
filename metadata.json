@@ -1,0 +1,10 @@
+{
+  "name": "Classroom Zombies Survival",
+  "description": "An arcade FPS survival game inspired by COD Zombies, set in a meticulously detailed abandoned classroom and dark hallway.",
+  "requestFramePermissions": [
+    "pointerLock"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

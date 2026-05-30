@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;700;900&family=Special+Elite&family=JetBrains+Mono:wght@400;600;900&display=swap');
+
+@theme {
+  --font-sans: 'Oswald', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-typewriter: 'Special Elite', cursive;
+}
