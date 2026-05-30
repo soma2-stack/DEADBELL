@@ -86,7 +86,8 @@ export default function App() {
     }
     
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // Match HTTP host and append path for the secure dual WebSocket pipeline upgrade
+    // In production, use the same host (server serves both HTTP and WS).
+    // In development, Vite proxies /ws -> localhost:3000 so window.location.host works correctly.
     const socketUrl = `${wsProtocol}//${window.location.host}/ws`;
     const ws = new WebSocket(socketUrl);
     
