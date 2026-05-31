@@ -520,7 +520,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 if (idx > -1) activeZombiesList.splice(idx, 1);
               }, 800);
               const reward = (hitZombie.scoreReward ?? 100) + (isHeadshot ? 50 : 0);
-              // Use Economy system for kills
               economy.add(reward, isHeadshot ? '💀 HEADSHOT' : 'KILL');
               stateRef.current.points = economy.points;
               setKills((k: number) => k + 1); stateRef.current.kills += 1;
@@ -636,7 +635,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             stateRef.current.points = economy.points;
             scene.remove(classroomExitDoor.group);
             doorBlockerBox=new THREE.Box3();
-            // Remove door from CollisionSystem too
             collision.removeBox('door-classroom-exit');
           } else { addScorePopup(0,'Need '+classroomExitDoor.price+' pts!'); }
           return;
@@ -657,6 +655,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           return;
         }
       }
+
+      // ROOMS door purchase via CollisionSystem
+      const interactable = collision.findInteractable(player.position);
+      if (interactable?.type === 'door' && interactable.id) {
+        const roomDoor = Object.values(ROOMS).flatMap(r => r.doors).find(d => d.id === interactable.id);
+        if (roomDoor && economy.spend(roomDoor.price, `Unlock ${roomDoor.target}`)) {
+          collision.removeBox(roomDoor.id);
+          stateRef.current.points = economy.points;
+        } else if (roomDoor) {
+          addScorePopup(0, 'Need ' + roomDoor.price + ' pts!');
+        }
+      }
     };
 
     const updateInteractMessage = () => {
@@ -672,7 +682,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           if (!owned) { setInteractMessage(`[E] Buy ${perk.name} - ${perk.price} pts`); return; }
         }
       }
-      // Check ROOMS door interactables
       const interactable = collision.findInteractable(camera.position);
       if (interactable?.type === 'door' && interactable.id) {
         const roomDoor = Object.values(ROOMS).flatMap(r => r.doors).find(d => d.id === interactable.id);
@@ -780,12 +789,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       maxRecoilOffset.y *= 0.82;
       gunRecoilZOffset  *= 0.78;
 
-      // Gun position in camera space
+      // 🔫 Gun position with weapon bob based on player speed
       if (activeGunGroup) {
         const adsLerp = stateRef.current.isADS ? 0.12 : 0;
+        const speed   = getPlayerSpeed(player);
+        const bobAmt  = speed / 6;
+        const bob     = Math.sin(now * 0.01) * 0.01 * (player.isSprinting ? 2 : 1) * bobAmt;
+        const sway    = Math.cos(now * 0.007) * 0.005 * bobAmt;
         activeGunGroup.position.set(
-          0.12 - adsLerp*0.12,
-          -0.11 + adsLerp*0.06,
+          0.12 - adsLerp*0.12 + sway,
+          -0.11 + adsLerp*0.06 + bob + gunRecoilZOffset * 0.1,
           -0.38 + gunRecoilZOffset
         );
         if (activeGunGroup.parent !== camera) camera.add(activeGunGroup);
