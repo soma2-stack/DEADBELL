@@ -1,6 +1,5 @@
 import { generateWornWallTexture, generateConcreteFloorTexture, generateCeilingTexture, generateWoodTexture } from '../map/textures';
 import { buildStaticMap } from './mapBuilder';
-import { buildClassroomA, buildClassroomB } from './rooms';
 import { spawnSingleZombie as spawnZombieHelper } from '../entities/zombies';
 import { buildPistolGroup, buildShotgunGroup, buildTomeOfPowerMachine, buildFastHandsMachine, tickReloadAnimation, ReloadAnimState, PerkMachine, WeaponDeps } from '../weapons/models';
 import { addShotgunWallbuy as _addShotgunWallbuy, buildBuyableDoor as _buildBuyableDoor } from '../map/interactables';
@@ -182,12 +181,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     const weaponDeps: WeaponDeps = { skinMaterial, sleeveMaterial, watchStrapsMat, watchBezelMat, watchGlassMat, woodTex, loaded3DModels };
 
     // --- CONSTANTS ---
-    const CLASSROOM_W      = 28;
-    const CLASSROOM_D      = 24;
+    const CLASSROOM_W      = 50;
+    const CLASSROOM_D      = 44;
     const WALL_H           = 4.5;
-    const HALLWAY_W        = 10;
-    const HALLWAY_D        = 32;
-    const HALLWAY_X_CENTER = 19;
+    const HALLWAY_W        = 22;
+    const HALLWAY_D        = 10;
     const PLAYER_HEIGHT    = 1.65;
     const GRAVITY          = -22.0;
     const JUMP_FORCE       =  8.5;
@@ -195,39 +193,50 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     const halogenLights: { mesh: THREE.Mesh; light: THREE.PointLight; basePower: number }[] = [];
 
     // --- BUILD MAP ---
+    // Step 1: Starting classroom legacy geometry (props, lights, walls)
     const classroomObstacles: THREE.Box3[] = buildStaticMap(
       scene,
       { wallMaterial, floorMaterial, ceilingMaterial, woodMaterial, blackMetalMaterial, chalkboardMaterial },
       halogenLights, []
     );
-    const roomDeps = { scene, wallMaterial, floorMaterial, ceilingMaterial, woodMaterial, blackMetalMaterial, chalkboardMaterial, woodTex, obstacles: classroomObstacles };
-    buildClassroomA(roomDeps);
-    buildClassroomB(roomDeps);
 
-    // 🎮 Initialize core systems
+    // Step 2: Build all ROOMS (hallway + classrooms 102/103) from ROOMS data
+    // ─── FIXED: material keys now match what buildRoom() expects ────────────
     const collision = new CollisionSystem();
-    const economy = new Economy(500, (pts, tx) => {
-      setPoints(pts);
-      if (tx.type === 'reward') addScorePopup(tx.amount, tx.reason);
-    });
-    const player = createPlayer(new THREE.Vector3(19, PLAYER_HEIGHT, -45));
-
-    // 🏗️ Build rooms into scene with collision
-    const roomMaterials = {
+    const roomMaterials: Record<string, THREE.Material> = {
       floor:    floorMaterial,
       wall:     wallMaterial,
-      obstacle: new THREE.MeshStandardMaterial({ color: 0x6B5444 }),
+      ceiling:  ceilingMaterial,
       wood:     woodMaterial,
+      obstacle: blackMetalMaterial,
+      board:    chalkboardMaterial,
+      locker:   new THREE.MeshStandardMaterial({ color: 0x1f3c4d, roughness: 0.65, metalness: 0.4 }),
+      debris:   floorMaterial,
+      perk:     new THREE.MeshStandardMaterial({ color: 0x22ffcc, roughness: 0.4, metalness: 0.6 }),
+      tome:     new THREE.MeshStandardMaterial({ color: 0xff9900, roughness: 0.5, metalness: 0.3 }),
+      chair:    woodMaterial,
     };
     Object.values(ROOMS).forEach(room => {
       buildRoom(room, scene, collision, roomMaterials);
     });
 
-    // 🎯 Collision callback wired to CollisionSystem
+    const economy = new Economy(500, (pts, tx) => {
+      setPoints(pts);
+      if (tx.type === 'reward') addScorePopup(tx.amount, tx.reason);
+    });
+
+    // Player spawns at Starting Classroom center
+    const sc = ROOMS.startingClassroom.bounds;
+    const playerStart = new THREE.Vector3(
+      (sc.minX + sc.maxX) / 2,
+      PLAYER_HEIGHT,
+      (sc.minZ + sc.maxZ) / 2
+    );
+    const player = createPlayer(playerStart);
+
     const checkPlayerCollision = (pos: THREE.Vector3, r: number, h: number) =>
       collision.check(pos, r, h);
 
-    // Sync camera to player start position
     camera.position.copy(player.position);
 
     // --- PERK MACHINES ---
@@ -239,19 +248,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     const particleList: { mesh: THREE.Mesh; vel: THREE.Vector3; age: number; maxAge: number }[] = [];
     const bulletTracers: { mesh: THREE.Line; age: number; maxAge: number }[] = [];
 
-    // --- SPAWNERS ---
-    const groundSpawners = [
-      { x: -10.0, z:  -8.0, label: 'Classroom NW' },
-      { x:  10.0, z:  -8.0, label: 'Classroom NE' },
-      { x: -10.0, z:   8.0, label: 'Classroom SW' },
-      { x:  10.0, z:   8.0, label: 'Classroom SE' },
-      { x:  -6.0, z:   1.0, label: 'Classroom West' },
-      { x:   6.0, z:  -1.0, label: 'Classroom East' },
-      { x:  19.0, z: -12.0, label: 'Hallway North' },
-      { x:  19.0, z:  12.0, label: 'Hallway South' },
-      { x:  18.0, z: -37.0, label: 'Science Lab' },
-      { x:  18.0, z:  37.0, label: 'Abandoned Classroom' },
-    ];
+    // --- SPAWNERS — derived from ROOMS.spawns so they stay in sync ---
+    const groundSpawners = Object.values(ROOMS).flatMap(room =>
+      room.spawns.map(s => ({ x: s.x, z: s.z, label: room.name }))
+    );
 
     // --- PARTICLES ---
     const triggerGravelEruption = (pos: THREE.Vector3) => {
@@ -266,10 +266,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     };
 
     const mapBoundingLimits = {
-      minX: -CLASSROOM_W/2 + 0.65, maxX: CLASSROOM_W/2 - 0.65,
-      minZ: -CLASSROOM_D/2 + 0.65, maxZ: CLASSROOM_D/2 - 0.65,
-      hallMinX: 14.5, hallMaxX: HALLWAY_X_CENTER + HALLWAY_W/2 - 0.65,
-      hallMinZ: -HALLWAY_D/2 + 0.65, hallMaxZ: HALLWAY_D/2 - 0.65,
+      minX: sc.minX + 0.65, maxX: sc.maxX - 0.65,
+      minZ: sc.minZ + 0.65, maxZ: sc.maxZ - 0.65,
+      hallMinX: ROOMS.hallway.bounds.minX + 0.5, hallMaxX: ROOMS.hallway.bounds.maxX - 0.5,
+      hallMinZ: ROOMS.hallway.bounds.minZ + 0.5, hallMaxZ: ROOMS.hallway.bounds.maxZ - 0.5,
     };
 
     // --- WALL BUY ---
@@ -286,14 +286,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       const ph  = new THREE.Mesh(new THREE.BoxGeometry(0.052,0.035,0.4), woodMaterial); ph.position.set(0,0.02,0.0); sG.add(ph);
       const wb  = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.12,0.45), woodMaterial); wb.position.set(0,-0.01,0.6); wb.rotation.x=-0.15; sG.add(wb);
       sG.rotation.y=-Math.PI/2; sG.position.set(0,-0.12,0.15); g.add(sG);
-      const wX=-CLASSROOM_W/2+0.28, wY=1.7, wZ=-1.5;
-      g.position.set(wX, wY, wZ); g.rotation.y=Math.PI/2;
+      const wX = sc.minX + 0.28, wY = 1.7, wZ = (sc.minZ + sc.maxZ) / 2 - 1.5;
+      g.position.set(wX, wY, wZ); g.rotation.y = Math.PI / 2;
       scene.add(g);
       return { id:'wall-shotgun', weaponId:'pump_shotgun', position:[wX+0.2,wY,wZ], rotationY:Math.PI/2, price:700, purchased:false, textMesh:g };
     };
     const shotgunWallBuy = buildShotgunWallBuy();
 
-    // --- BUYABLE DOOR ---
+    // --- BUYABLE DOOR (starting classroom → hallway) ---
     const buildMainDoor = (): BuyableDoor => {
       const g = new THREE.Group();
       const doorW=0.25, doorH=3.6, doorLen=4.0;
@@ -305,12 +305,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.strokeStyle='#22c55e'; ctx.lineWidth=6; ctx.strokeRect(4,4,504,120);
       ctx.fillStyle='#22c55e'; ctx.font='bold 38px Courier New'; ctx.textAlign='center';
       ctx.fillText('DOOR',256,45); ctx.font='bold 28px Courier New';
-      ctx.fillText('Press E to Open [$1200]',256,95);
+      ctx.fillText('Press E to Open [$750]',256,95);
       const overlay=new THREE.Mesh(new THREE.PlaneGeometry(2.5,0.75), new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(sc2), side:THREE.DoubleSide, transparent:true }));
       overlay.position.set(-0.25,3.2,0); overlay.rotation.y=-Math.PI/2; g.add(overlay);
-      const dX=CLASSROOM_W/2, dY=0, dZ=0;
+      const dX = sc.maxX, dY = 0, dZ = 0;
       g.position.set(dX,dY,dZ); scene.add(g);
-      return { id:'door-classroom-exit', price:1200, position:[dX,dY,dZ], rotationY:0, width:doorW, height:doorH, purchased:false, group:g, doorMesh, sinkOffset:0 };
+      return { id:'door-classroom-exit', price:750, position:[dX,dY,dZ], rotationY:0, width:doorW, height:doorH, purchased:false, group:g, doorMesh, sinkOffset:0 };
     };
     const classroomExitDoor = buildMainDoor();
     let doorBlockerBox = new THREE.Box3().setFromObject(classroomExitDoor.doorMesh!);
@@ -492,374 +492,4 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           targetDir.y += (Math.random()-0.5)*spreadParam*2;
           targetDir.normalize();
         }
-        raycaster.set(camera.position, targetDir);
-        const zombieMeshes = activeZombiesList.map(z => z.mesh).filter(Boolean);
-        const hits = raycaster.intersectObjects(zombieMeshes, true);
-        if (hits.length > 0) {
-          const hitObj = hits[0];
-          let hitZombie: Zombie | undefined;
-          outer: for (const z of activeZombiesList) {
-            let cur: THREE.Object3D | null = hitObj.object;
-            while (cur) {
-              if (cur === z.mesh) { hitZombie = z; break outer; }
-              cur = cur.parent;
-            }
-          }
-          if (hitZombie && hitZombie.state !== 'dead') {
-            const isHeadshot = hitObj.object.name?.toLowerCase().includes('head') || (hitObj.point.y - hitZombie.mesh.position.y) > 1.5;
-            const baseDmg    = id === 'pistol' ? 38 : 22;
-            const dmg        = Math.round(baseDmg * dmgMult * (isHeadshot ? 2 : 1));
-            hitZombie.health -= dmg;
-            triggerBulletTracer(camera.position.clone(), hitObj.point.clone());
-            if (hitZombie.health <= 0) {
-              hitZombie.state = 'dead';
-              triggerBloodExplosion(hitZombie.mesh.position.clone());
-              setTimeout(() => {
-                zombieGroup.remove(hitZombie!.mesh);
-                const idx = activeZombiesList.indexOf(hitZombie!);
-                if (idx > -1) activeZombiesList.splice(idx, 1);
-              }, 800);
-              const reward = (hitZombie.scoreReward ?? 100) + (isHeadshot ? 50 : 0);
-              economy.add(reward, isHeadshot ? '💀 HEADSHOT' : 'KILL');
-              stateRef.current.points = economy.points;
-              setKills((k: number) => k + 1); stateRef.current.kills += 1;
-              setHitmarker('kill');
-              createFloatingDamageNumber(hitZombie.mesh.position.clone(), isHeadshot ? `💀 ${dmg}` : `${dmg}`, isHeadshot ? 'headshot-kill' : 'kill');
-              roundKillsRemaining--;
-              if (isCoop && socket && socket.readyState === WebSocket.OPEN)
-                socket.send(JSON.stringify({ type: 'zombie-killed', zombieId: hitZombie.id }));
-              if (roundKillsRemaining <= 0 && zombiesLeftToSpawn <= 0) {
-                economy.add(Economy.REWARD.WAVE, 'Wave Clear');
-                stateRef.current.points = economy.points;
-                setTimeout(() => {
-                  setCurrentRound((r: number) => { const nr=r+1; stateRef.current.currentRound=nr; return nr; });
-                  startNextRoundWave();
-                }, 2500);
-              }
-            } else {
-              setHitmarker('hit');
-              createFloatingDamageNumber(hitZombie.mesh.position.clone().add(new THREE.Vector3(0,1.8,0)), `${dmg}`, isHeadshot ? 'headshot-hit' : 'hit');
-            }
-          }
-        }
-      }
-    };
-
-    // --- GUN VIEWMODEL ---
-    let pistolGroup:   THREE.Group | null = null;
-    let shotgunGroup:  THREE.Group | null = null;
-    let activeGunGroup: THREE.Group | null = null;
-
-    const updateActiveGunModel = (weapId: string) => {
-      if (activeGunGroup) camera.remove(activeGunGroup);
-      if (weapId === 'pistol') {
-        if (!pistolGroup) pistolGroup = buildPistolGroup(weaponDeps);
-        activeGunGroup = pistolGroup;
-      } else {
-        if (!shotgunGroup) shotgunGroup = buildShotgunGroup(weaponDeps);
-        activeGunGroup = shotgunGroup;
-      }
-      if (activeGunGroup) {
-        activeGunGroup.position.set(0.12, -0.11, -0.38);
-        camera.add(activeGunGroup);
-      }
-    };
-    updateActiveGunModel(stateRef.current.activeWeaponId);
-
-    const swapWeapon = (weapId: 'pistol'|'shotgun') => {
-      if (!weaponsOwnedRef.current.includes(weapId)) return;
-      if (stateRef.current.activeWeaponId === weapId) return;
-      const cur = stateRef.current.activeWeaponId as 'pistol'|'shotgun';
-      weaponAmmoRef.current[cur].clip    = stateRef.current.ammoClip;
-      weaponAmmoRef.current[cur].reserve = stateRef.current.ammoReserve;
-      stateRef.current.activeWeaponId    = weapId;
-      setActiveWeaponId(weapId);
-      const { clip, reserve } = weaponAmmoRef.current[weapId];
-      stateRef.current.ammoClip    = clip;
-      stateRef.current.ammoReserve = reserve;
-      setAmmoClip(clip);
-      setAmmoReserve(reserve);
-      updateActiveGunModel(weapId);
-    };
-
-    // --- RELOAD ---
-    let reloadAnimState: ReloadAnimState = { active:false, time:0, duration:1.5, weaponId:'pistol' };
-    const triggerWeaponReload = () => {
-      if (stateRef.current.isReloading) return;
-      const id   = stateRef.current.activeWeaponId as 'pistol'|'shotgun';
-      const ammo = weaponAmmoRef.current[id];
-      if (ammo.clip >= ammo.maxClip || ammo.reserve <= 0) return;
-      const dur = id==='shotgun' ? (stateRef.current.hasFastHands ? 2.0 : 3.2) : (stateRef.current.hasFastHands ? 0.9 : 1.5);
-      reloadAnimState = { active:true, time:0, duration:dur, weaponId:id };
-      setIsReloading(true); stateRef.current.isReloading=true;
-      sound.playReloadClick(1.0);
-      setTimeout(() => {
-        const needed=ammo.maxClip-ammo.clip;
-        const give=Math.min(needed,ammo.reserve);
-        ammo.clip    += give;
-        ammo.reserve -= give;
-        stateRef.current.ammoClip    = ammo.clip;
-        stateRef.current.ammoReserve = ammo.reserve;
-        setAmmoClip(ammo.clip); setAmmoReserve(ammo.reserve);
-        setIsReloading(false); stateRef.current.isReloading=false;
-        reloadAnimState.active=false;
-      }, dur*1000);
-    };
-
-    // --- INTERACT ---
-    const processInteractEvent = () => {
-      const now = performance.now();
-      if (now - lastInteractionPulse < 300) return;
-      lastInteractionPulse = now;
-      const playerPos = camera.position;
-
-      if (!shotgunWallBuy.purchased) {
-        const wbp=shotgunWallBuy.position;
-        if (playerPos.distanceTo(new THREE.Vector3(wbp[0],wbp[1],wbp[2])) < 2.2) {
-          if (economy.spend(shotgunWallBuy.price, 'Shotgun Bought!')) {
-            shotgunWallBuy.purchased=true;
-            stateRef.current.points = economy.points;
-            weaponsOwnedRef.current.push('shotgun');
-            weaponAmmoRef.current.shotgun={clip:6,reserve:24,maxClip:6,maxReserve:48};
-            swapWeapon('shotgun');
-          } else { addScorePopup(0,'Need '+shotgunWallBuy.price+' pts!'); }
-          return;
-        }
-      }
-
-      if (!classroomExitDoor.purchased) {
-        const dp=classroomExitDoor.position;
-        if (playerPos.distanceTo(new THREE.Vector3(dp[0],dp[1],dp[2])) < 2.8) {
-          if (economy.spend(classroomExitDoor.price, 'Door Opened!')) {
-            classroomExitDoor.purchased=true;
-            stateRef.current.points = economy.points;
-            scene.remove(classroomExitDoor.group);
-            doorBlockerBox=new THREE.Box3();
-            collision.removeBox('door-classroom-exit');
-          } else { addScorePopup(0,'Need '+classroomExitDoor.price+' pts!'); }
-          return;
-        }
-      }
-
-      for (const perk of perkMachines) {
-        const pp=perk.position;
-        const pv=pp instanceof THREE.Vector3 ? pp : new THREE.Vector3(pp[0],pp[1],pp[2]);
-        if (playerPos.distanceTo(pv) < 2.0) {
-          if (perk.id==='tome-of-power' && !stateRef.current.hasTomeOfPower) {
-            if (economy.spend(perk.price, '🔮 Tome of Power!')) { stateRef.current.hasTomeOfPower=true; stateRef.current.points=economy.points; }
-            else addScorePopup(0,'Need '+perk.price+' pts!');
-          } else if (perk.id==='fast-hands' && !stateRef.current.hasFastHands) {
-            if (economy.spend(perk.price, '⚡ Fast Hands!')) { stateRef.current.hasFastHands=true; setHasFastHands(true); stateRef.current.points=economy.points; }
-            else addScorePopup(0,'Need '+perk.price+' pts!');
-          }
-          return;
-        }
-      }
-
-      // ROOMS door purchase via CollisionSystem
-      const interactable = collision.findInteractable(player.position);
-      if (interactable?.type === 'door' && interactable.id) {
-        const roomDoor = Object.values(ROOMS).flatMap(r => r.doors).find(d => d.id === interactable.id);
-        if (roomDoor && economy.spend(roomDoor.price, `Unlock ${roomDoor.target}`)) {
-          collision.removeBox(roomDoor.id);
-          stateRef.current.points = economy.points;
-        } else if (roomDoor) {
-          addScorePopup(0, 'Need ' + roomDoor.price + ' pts!');
-        }
-      }
-    };
-
-    const updateInteractMessage = () => {
-      const pp=camera.position;
-      const wbp=shotgunWallBuy.position;
-      if (!shotgunWallBuy.purchased && pp.distanceTo(new THREE.Vector3(wbp[0],wbp[1],wbp[2]))<2.2) { setInteractMessage(`[E] Buy Shotgun - ${shotgunWallBuy.price} pts`); return; }
-      const dp=classroomExitDoor.position;
-      if (!classroomExitDoor.purchased && pp.distanceTo(new THREE.Vector3(dp[0],dp[1],dp[2]))<2.8) { setInteractMessage(`[E] Open Door - ${classroomExitDoor.price} pts`); return; }
-      for (const perk of perkMachines) {
-        const pv=perk.position instanceof THREE.Vector3 ? perk.position : new THREE.Vector3(perk.position[0],perk.position[1],perk.position[2]);
-        if (pp.distanceTo(pv)<2.0) {
-          const owned=perk.id==='tome-of-power' ? stateRef.current.hasTomeOfPower : stateRef.current.hasFastHands;
-          if (!owned) { setInteractMessage(`[E] Buy ${perk.name} - ${perk.price} pts`); return; }
-        }
-      }
-      const interactable = collision.findInteractable(camera.position);
-      if (interactable?.type === 'door' && interactable.id) {
-        const roomDoor = Object.values(ROOMS).flatMap(r => r.doors).find(d => d.id === interactable.id);
-        if (roomDoor) { setInteractMessage(`[E] Open Door - ${roomDoor.price} pts`); return; }
-      }
-      setInteractMessage(null);
-    };
-
-    // --- EVENTS ---
-    containerRef.current.addEventListener('click', handlePointerLock);
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('keydown',   onKeyDown);
-    document.addEventListener('keyup',     onKeyUp);
-    document.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('mouseup',   onMouseUp);
-
-    const onResize = () => {
-      if (!containerRef.current) return;
-      const w=containerRef.current.clientWidth, h=containerRef.current.clientHeight;
-      camera.aspect=w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h);
-    };
-    window.addEventListener('resize', onResize);
-
-    // --- ANIMATE LOOP ---
-    let lastTime    = performance.now();
-    let animFrameId = 0;
-
-    const animate = () => {
-      animFrameId = requestAnimationFrame(animate);
-      const now   = performance.now();
-      const delta = Math.min((now - lastTime) / 1000, 0.05);
-      lastTime    = now;
-
-      if (stateRef.current.gameState !== 'playing') {
-        renderer.render(scene, camera);
-        return;
-      }
-
-      // FOV lerp
-      const targetFov = stateRef.current.isADS ? stateRef.current.fov*0.65 : stateRef.current.fov;
-      camera.fov += (targetFov - camera.fov) * 0.18;
-      camera.updateProjectionMatrix();
-
-      // Spawn zombies
-      if (zombiesLeftToSpawn > 0 && !roundTransitionActive) {
-        spawnTimer -= delta;
-        if (spawnTimer <= 0) {
-          spawnTimer = 0.8 + Math.random()*0.6;
-          spawnSingleZombie(Math.floor(Math.random()*groundSpawners.length));
-          zombiesLeftToSpawn--;
-        }
-      }
-
-      // Zombie AI
-      for (const zombie of activeZombiesList) {
-        if (zombie.state === 'dead') continue;
-        zombie.animTime += delta;
-        if (zombie.state === 'spawning') {
-          triggerGravelEruption(zombie.mesh.position);
-          zombie.mesh.position.y = Math.max(-1.5 + zombie.animTime * 2.2, 0);
-          if (zombie.animTime > 1.2) { zombie.state='chasing'; zombie.mesh.position.y=0; }
-          continue;
-        }
-        const toPlayer = new THREE.Vector3().subVectors(camera.position, zombie.mesh.position);
-        const dist     = toPlayer.length();
-        toPlayer.normalize();
-        if (dist > 1.1) {
-          zombie.state='chasing';
-          zombie.mesh.position.addScaledVector(toPlayer, zombie.speed*delta);
-          zombie.mesh.lookAt(camera.position.x, zombie.mesh.position.y, camera.position.z);
-          zombie.mesh.position.y = Math.abs(Math.sin(zombie.animTime*6))*0.06;
-        } else {
-          zombie.state='attacking';
-          if (now - zombie.lastAttackTime > 900) {
-            zombie.lastAttackTime=now;
-            if (stateRef.current.health > 0) {
-              const newHp=Math.max(0, stateRef.current.health - zombie.damage);
-              stateRef.current.health=newHp; setHealth(newHp); lastDamageTime=now;
-              if (newHp <= 0) setGameState('gameover');
-            }
-          }
-        }
-      }
-
-      // 🎮 Player movement via updatePlayer()
-      updatePlayer(
-        player,
-        keysMap,
-        mouseDeltas,
-        delta,
-        checkPlayerCollision
-      );
-      mouseDeltas.x = 0;
-      mouseDeltas.y = 0;
-
-      // Sync camera to player state
-      camera.position.copy(player.position);
-      const euler = new THREE.Euler(player.pitch + recoilOffset.y, player.yaw + recoilOffset.x, 0, 'YXZ');
-      camera.quaternion.setFromEuler(euler);
-
-      // Recoil decay
-      recoilOffset.x    += (maxRecoilOffset.x - recoilOffset.x)*0.18;
-      recoilOffset.y    += (maxRecoilOffset.y - recoilOffset.y)*0.18;
-      maxRecoilOffset.x *= 0.82;
-      maxRecoilOffset.y *= 0.82;
-      gunRecoilZOffset  *= 0.78;
-
-      // 🔫 Gun position with weapon bob based on player speed
-      if (activeGunGroup) {
-        const adsLerp = stateRef.current.isADS ? 0.12 : 0;
-        const speed   = getPlayerSpeed(player);
-        const bobAmt  = speed / 6;
-        const bob     = Math.sin(now * 0.01) * 0.01 * (player.isSprinting ? 2 : 1) * bobAmt;
-        const sway    = Math.cos(now * 0.007) * 0.005 * bobAmt;
-        activeGunGroup.position.set(
-          0.12 - adsLerp*0.12 + sway,
-          -0.11 + adsLerp*0.06 + bob + gunRecoilZOffset * 0.1,
-          -0.38 + gunRecoilZOffset
-        );
-        if (activeGunGroup.parent !== camera) camera.add(activeGunGroup);
-        tickReloadAnimation(reloadAnimState, activeGunGroup, delta);
-      }
-
-      if (fireCooldownLeft > 0) fireCooldownLeft -= delta;
-
-      // Particles
-      for (let i=particleList.length-1; i>=0; i--) {
-        const pt=particleList[i]; pt.age+=delta;
-        pt.mesh.position.addScaledVector(pt.vel, delta); pt.vel.y -= 9.8*delta;
-        if (pt.age>=pt.maxAge) { scene.remove(pt.mesh); particleList.splice(i,1); }
-      }
-      // Tracers
-      for (let i=bulletTracers.length-1; i>=0; i--) {
-        const tr=bulletTracers[i]; tr.age+=delta;
-        if (tr.age>=tr.maxAge) { scene.remove(tr.mesh); bulletTracers.splice(i,1); }
-      }
-      // Floating numbers
-      for (let i=floatingDmgNumbers.length-1; i>=0; i--) {
-        const fn=floatingDmgNumbers[i]; fn.age+=delta; fn.pos.y+=delta*1.2;
-        const proj=fn.pos.clone().project(camera);
-        fn.element.style.left   = ((proj.x*0.5+0.5)*window.innerWidth) +'px';
-        fn.element.style.top    = ((proj.y*-0.5+0.5)*window.innerHeight)+'px';
-        fn.element.style.opacity= String(1-fn.age/fn.maxAge);
-        if (fn.age>=fn.maxAge) { document.body.removeChild(fn.element); floatingDmgNumbers.splice(i,1); }
-      }
-      // Flicker
-      for (const hl of halogenLights) {
-        if (Math.random()<0.004) hl.light.intensity=hl.basePower*(0.3+Math.random()*0.7);
-        else                     hl.light.intensity+=(hl.basePower-hl.light.intensity)*0.05;
-      }
-
-      updateInteractMessage();
-
-      if (isCoop && socketRef.current && socketRef.current.readyState===WebSocket.OPEN) {
-        if (now - lastUpdateSentTimeRef.current > 50) {
-          lastUpdateSentTimeRef.current=now;
-          socketRef.current.send(JSON.stringify({ type:'player-update', pos:{x:camera.position.x,y:camera.position.y,z:camera.position.z}, yaw:player.yaw, health:stateRef.current.health, points:stateRef.current.points, activeWeapon:stateRef.current.activeWeaponId }));
-        }
-      }
-
-      renderer.render(scene, camera);
-    };
-
-    animate();
-
-    return () => {
-      cancelAnimationFrame(animFrameId);
-      containerRef.current?.removeEventListener('click', handlePointerLock);
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('keydown',   onKeyDown);
-      document.removeEventListener('keyup',     onKeyUp);
-      document.removeEventListener('mousedown', onMouseDown);
-      document.removeEventListener('mouseup',   onMouseUp);
-      window.removeEventListener('resize',      onResize);
-      renderer.dispose();
-      for (const fn of floatingDmgNumbers) if (fn.element.parentNode) document.body.removeChild(fn.element);
-    };
-  }, []);
-
-  return <div ref={containerRef} className="w-full h-full" />;
-};
+        raycaster.set(ca
