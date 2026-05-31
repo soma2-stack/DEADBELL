@@ -1,16 +1,20 @@
 // src/world/rooms.ts
 //
-// Ft. Knell Academy – revised layout:
+// Ft. Knell Academy layout:
 //
-//  [Starting Classroom] ── [Short Hallway] ── [Main Classroom]
-//       X:-58..-8              X:-8..8            X:8..48
-//       Z:-22..22              Z:-5..5            Z:-25..25
-//
-// The two classrooms are merged into one large "Main Classroom"
-// directly east of the Starting Classroom, connected by a short hallway.
-// Both Fast Hands and the Forbidden Tome live inside the Main Classroom.
+//                        [Classroom 102]  ← Fast Hands + Forbidden Tome
+//                             |
+//  [Starting Classroom] ── [Hallway 1]
+//                             |
+//                        [Classroom 103]
 //
 // Three.js axes:  X+ = East,  Z+ = South,  Y = Up
+//
+// Coordinates:
+//   Starting Classroom  X: -58 .. -8   Z: -22 .. 22   (50×44)
+//   Hallway 1           X:  -8 .. 14   Z:  -5 ..  5   (22×10)
+//   Classroom 102       X:  14 .. 54   Z: -40 .. -5   (40×35)  north
+//   Classroom 103       X:  14 .. 54   Z:   5 .. 40   (40×35)  south
 
 import * as THREE from 'three';
 import { CollisionSystem } from '../core/collision';
@@ -43,7 +47,7 @@ export type Room = {
 type WallDef = {
   x: number; z: number;
   length: number;
-  isX: boolean; // true = runs along X axis, false = along Z axis
+  isX: boolean;
 };
 
 type ObstacleDef = {
@@ -59,7 +63,8 @@ export const ROOMS: Record<string, Room> = {
 
   // ┌──────────────────────────────────────────────────────────────────────────┐
   // │  STARTING CLASSROOM  –  west, largest room                               │
-  // │  X: -58 .. -8    Z: -22 .. 22   (50 × 44)                               │
+  // │  X: -58 .. -8    Z: -22 .. 22   (50×44)                                 │
+  // │  Buyable door on east wall opens into Hallway 1                          │
   // └──────────────────────────────────────────────────────────────────────────┘
   startingClassroom: {
     id: 'startingClassroom',
@@ -69,19 +74,19 @@ export const ROOMS: Record<string, Room> = {
       // West wall (full)
       { x: -58, z: -22, length: 44, isX: false },
       // North wall (full)
-      { x: -58, z: -22, length: 50, isX: true  },
+      { x: -58, z: -22, length: 50, isX: true },
       // South wall (full)
-      { x: -58, z:  22, length: 50, isX: true  },
-      // East wall – gap Z:-5..5 (10 units wide) opens into hallway
-      { x: -8,  z: -22, length: 17, isX: false }, // north section  Z:-22 → -5
-      { x: -8,  z:   5, length: 17, isX: false }, // south section  Z:5  →  22
+      { x: -58, z:  22, length: 50, isX: true },
+      // East wall – gap Z:-5..5 (buyable door into hallway)
+      { x: -8, z: -22, length: 17, isX: false }, // north section Z:-22→-5
+      { x: -8, z:   5, length: 17, isX: false }, // south section Z:5→22
     ],
     obstacles: [
       // Teacher desk + chair (north wall)
-      { id: 'td',  x: -33, y: 0.75, z: -18,   w: 4.0, h: 0.75, d: 1.6,  type: 'desk'  },
-      { id: 'tc',  x: -33, y: 0.45, z: -16.5, w: 0.5, h: 0.45, d: 0.5,  type: 'chair' },
-      // Whiteboard (north wall)
-      { id: 'wb',  x: -33, y: 2.5,  z: -21.9, w: 10,  h: 2.2,  d: 0.08, type: 'board' },
+      { id: 'td', x: -33, y: 0.75, z: -18,   w: 4.0, h: 0.75, d: 1.6,  type: 'desk'  },
+      { id: 'tc', x: -33, y: 0.45, z: -16.5, w: 0.5, h: 0.45, d: 0.5,  type: 'chair' },
+      // Whiteboard
+      { id: 'wb', x: -33, y: 2.5,  z: -21.9, w: 10,  h: 2.2,  d: 0.08, type: 'board' },
       // Student desks – 4 cols × 3 rows
       ...studentDesks(-52, -14, -12, 4, 3, 0, 3.2),
       // Lockers – west wall
@@ -97,8 +102,8 @@ export const ROOMS: Record<string, Room> = {
       {
         id: 'door-start-hall',
         x: -8, z: 0,
-        rotationY: 0,   // faces east → hallway
-        price: 0,
+        rotationY: 0,     // faces east into hallway
+        price: 750,       // buyable door
         target: 'hallway',
         width: 4.0,
       },
@@ -114,112 +119,168 @@ export const ROOMS: Record<string, Room> = {
   },
 
   // ┌──────────────────────────────────────────────────────────────────────────┐
-  // │  HALLWAY 1  –  short horizontal connector                                │
-  // │  X: -8 .. 8    Z: -5 .. 5   (16 × 10)                                   │
+  // │  HALLWAY 1  –  horizontal connector                                      │
+  // │  X: -8 .. 14   Z: -5 .. 5   (22×10)                                     │
+  // │  North wall gap → Classroom 102   South wall gap → Classroom 103         │
   // └──────────────────────────────────────────────────────────────────────────┘
   hallway: {
     id: 'hallway',
     name: 'Hallway 1',
-    bounds: { minX: -8, maxX: 8, minZ: -5, maxZ: 5 },
+    bounds: { minX: -8, maxX: 14, minZ: -5, maxZ: 5 },
     walls: [
-      // North wall – full (no side rooms branch off hallway anymore)
-      { x: -8, z: -5, length: 16, isX: true },
-      // South wall – full
-      { x: -8, z:  5, length: 16, isX: true },
-      // West opening handled by Starting Classroom east wall gap
-      // East opening handled by Main Classroom west wall gap
+      // North wall – gap X:0..10 leads to Classroom 102
+      { x: -8, z: -5, length: 8,  isX: true }, // west section  X:-8→0
+      { x: 10, z: -5, length: 4,  isX: true }, // east section  X:10→14
+      // South wall – gap X:0..10 leads to Classroom 103
+      { x: -8, z:  5, length: 8,  isX: true }, // west section
+      { x: 10, z:  5, length: 4,  isX: true }, // east section
+      // East cap (full)
+      { x: 14, z: -5, length: 10, isX: false },
     ],
     obstacles: [
-      // Lockers on north wall
-      { id: 'hlk0', x: -5, y: 1.8, z: -4.1, w: 0.7, h: 1.8, d: 0.2, type: 'locker' },
-      { id: 'hlk1', x: -1, y: 1.8, z: -4.1, w: 0.7, h: 1.8, d: 0.2, type: 'locker' },
-      { id: 'hlk2', x:  3, y: 1.8, z: -4.1, w: 0.7, h: 1.8, d: 0.2, type: 'locker' },
-      // Wall-buy stations (north + south)
-      { id: 'wbn', x: -3, y: 1.8, z: -4.3, w: 0.5, h: 0.5, d: 0.3, type: 'generic' },
-      { id: 'wbs', x: -3, y: 1.8, z:  4.3, w: 0.5, h: 0.5, d: 0.3, type: 'generic' },
+      // Lockers on north wall west side
+      { id: 'hlk0', x: -6, y: 1.8, z: -4.1, w: 0.7, h: 1.8, d: 0.2, type: 'locker' },
+      { id: 'hlk1', x: -2, y: 1.8, z: -4.1, w: 0.7, h: 1.8, d: 0.2, type: 'locker' },
+      // Wall-buy north + south
+      { id: 'wbn', x: 3, y: 1.8, z: -4.3, w: 0.5, h: 0.5, d: 0.3, type: 'generic' },
+      { id: 'wbs', x: 3, y: 1.8, z:  4.3, w: 0.5, h: 0.5, d: 0.3, type: 'generic' },
       // Debris
-      { id: 'hdb', x: 0, y: 0.1, z: 0, w: 0.6, h: 0.1, d: 0.4, type: 'debris' },
+      { id: 'hdb', x: 10, y: 0.1, z: 0, w: 0.6, h: 0.1, d: 0.4, type: 'debris' },
     ],
     doors: [
-      // East door – into Main Classroom (buyable)
+      // North – into Classroom 102 (buyable)
       {
-        id: 'door-hall-main',
-        x: 8, z: 0,
-        rotationY: 0,
+        id: 'door-hall-102',
+        x: 5, z: -5,
+        rotationY: Math.PI / 2,
         price: 1500,
-        target: 'mainClassroom',
+        target: 'classroom102',
+        width: 4.0,
+      },
+      // South – into Classroom 103 (buyable)
+      {
+        id: 'door-hall-103',
+        x: 5, z: 5,
+        rotationY: -Math.PI / 2,
+        price: 1250,
+        target: 'classroom103',
         width: 4.0,
       },
     ],
     spawns: [
-      { x: 0, z: 0, weight: 2 },
+      { x: 0,  z: 0, weight: 2 },
+      { x: 10, z: 0, weight: 1 },
     ],
   },
 
   // ┌──────────────────────────────────────────────────────────────────────────┐
-  // │  MAIN CLASSROOM  –  east, combined 102+103 room                          │
-  // │  X: 8 .. 48    Z: -25 .. 25   (40 × 50)                                 │
-  // │  Contains: Fast Hands perk + Forbidden Tome                              │
+  // │  CLASSROOM 102  –  north of hallway                                      │
+  // │  X: 14 .. 54   Z: -40 .. -5   (40×35)                                   │
+  // │  Contains: FAST HANDS perk + FORBIDDEN TOME (mystery box)                │
   // └──────────────────────────────────────────────────────────────────────────┘
-  mainClassroom: {
-    id: 'mainClassroom',
-    name: 'Main Classroom',
-    bounds: { minX: 8, maxX: 48, minZ: -25, maxZ: 25 },
+  classroom102: {
+    id: 'classroom102',
+    name: 'Classroom 102',
+    bounds: { minX: 14, maxX: 54, minZ: -40, maxZ: -5 },
     walls: [
-      // West wall – gap Z:-5..5 opens into hallway
-      { x: 8, z: -25, length: 20, isX: false }, // north section  Z:-25 → -5
-      { x: 8, z:   5, length: 20, isX: false }, // south section  Z:5  →  25
+      // South wall – gap X:0..10 aligned with hallway north door gap
+      { x: 14, z: -5, length: 0,  isX: true }, // dummy placeholder for gap
+      { x: 24, z: -5, length: 30, isX: true }, // X:24→54
       // North wall (full)
-      { x:  8, z: -25, length: 40, isX: true },
-      // South wall (full)
-      { x:  8, z:  25, length: 40, isX: true },
+      { x: 14, z: -40, length: 40, isX: true },
+      // West wall (full)
+      { x: 14, z: -40, length: 35, isX: false },
       // East wall (full)
-      { x: 48, z: -25, length: 50, isX: false },
+      { x: 54, z: -40, length: 35, isX: false },
     ],
     obstacles: [
       // Teacher desk + whiteboard (north wall)
-      { id: 'mtd', x: 28, y: 0.75, z: -21,   w: 4.0, h: 0.75, d: 1.6,  type: 'desk'  },
-      { id: 'mtc', x: 28, y: 0.45, z: -19.5, w: 0.5, h: 0.45, d: 0.5,  type: 'chair' },
-      { id: 'mwb', x: 28, y: 2.5,  z: -24.9, w: 12,  h: 2.2,  d: 0.08, type: 'board' },
-
-      // Student desks – 4 cols × 3 rows (centre of room)
-      ...studentDesks(13, 43, -14, 4, 3, 0, 4.0),
-
-      // Lockers – east wall
-      { id: 'mlk0', x: 47.1, y: 1.8, z: -18, w: 0.2, h: 1.8, d: 0.7, type: 'locker' },
-      { id: 'mlk1', x: 47.1, y: 1.8, z: -15, w: 0.2, h: 1.8, d: 0.7, type: 'locker' },
-      { id: 'mlk2', x: 47.1, y: 1.8, z:  15, w: 0.2, h: 1.8, d: 0.7, type: 'locker' },
-      { id: 'mlk3', x: 47.1, y: 1.8, z:  18, w: 0.2, h: 1.8, d: 0.7, type: 'locker' },
-
+      { id: '102td', x: 34, y: 0.75, z: -36,   w: 4.0, h: 0.75, d: 1.6,  type: 'desk'  },
+      { id: '102tc', x: 34, y: 0.45, z: -34.5, w: 0.5, h: 0.45, d: 0.5,  type: 'chair' },
+      { id: '102wb', x: 34, y: 2.5,  z: -39.9, w: 12,  h: 2.2,  d: 0.08, type: 'board' },
+      // Student desks – 3 cols × 3 rows
+      ...studentDesks(20, 48, -30, 3, 3, 0, 4.0),
+      // Lockers – west wall
+      { id: '102lk0', x: 14.9, y: 1.8, z: -30, w: 0.2, h: 1.8, d: 0.7, type: 'locker' },
+      { id: '102lk1', x: 14.9, y: 1.8, z: -26, w: 0.2, h: 1.8, d: 0.7, type: 'locker' },
       // Debris
-      { id: 'mdb0', x: 12,  y: 0.2,  z:  22, w: 1.0, h: 0.2,  d: 0.7, type: 'debris' },
-      { id: 'mdb1', x: 44,  y: 0.15, z: -22, w: 0.6, h: 0.15, d: 0.9, type: 'debris' },
-      { id: 'mdb2', x: 25,  y: 0.1,  z:   8, w: 1.2, h: 0.1,  d: 0.5, type: 'debris' },
+      { id: '102db0', x: 50, y: 0.2,  z:  -8, w: 1.0, h: 0.2,  d: 0.6, type: 'debris' },
+      { id: '102db1', x: 18, y: 0.15, z: -38, w: 0.7, h: 0.15, d: 0.9, type: 'debris' },
 
       // ── FAST HANDS perk machine – north-east corner ──
-      { id: 'fastHandsMachine', x: 45, y: 1.4, z: -22, w: 1.2, h: 2.8, d: 0.6, type: 'perk' },
+      { id: 'fastHandsMachine', x: 51, y: 1.4, z: -37, w: 1.2, h: 2.8, d: 0.6, type: 'perk' },
 
-      // ── FORBIDDEN TOME – south-east corner, east wall ──
-      { id: 'forbiddenTomePedestal', x: 47, y: 0.9,  z: 22,  w: 0.8,  h: 0.9,  d: 0.8, type: 'generic' },
-      { id: 'forbiddenTomeBook',     x: 47, y: 2.05, z: 22,  w: 0.55, h: 0.05, d: 0.85, type: 'tome'    },
+      // ── FORBIDDEN TOME (mystery box) – south-east corner, east wall ──
+      { id: 'forbiddenTomePedestal', x: 53, y: 0.9,  z: -9,  w: 0.8,  h: 0.9,  d: 0.8, type: 'generic' },
+      { id: 'forbiddenTomeBook',     x: 53, y: 2.05, z: -9,  w: 0.55, h: 0.05, d: 0.85, type: 'tome'    },
     ],
     doors: [
-      // West door back into hallway
       {
-        id: 'door-main-hall',
-        x: 8, z: 0,
-        rotationY: Math.PI, // faces west → hallway
+        id: 'door-102-hall',
+        x: 5, z: -5,
+        rotationY: -Math.PI / 2, // faces south back into hallway
         price: 1500,
         target: 'hallway',
         width: 4.0,
       },
     ],
     spawns: [
-      { x: 12,  z: -22, weight: 2 },
-      { x: 44,  z: -22, weight: 2 },
-      { x: 44,  z:  22, weight: 2 },
-      { x: 12,  z:  22, weight: 2 },
-      { x: 28,  z:   0, weight: 1 },
+      { x: 18, z: -37, weight: 2 },
+      { x: 50, z: -37, weight: 2 },
+      { x: 50, z: -10, weight: 2 },
+      { x: 18, z: -10, weight: 2 },
+      { x: 34, z: -22, weight: 1 },
+    ],
+  },
+
+  // ┌──────────────────────────────────────────────────────────────────────────┐
+  // │  CLASSROOM 103  –  south of hallway  (plain classroom)                   │
+  // │  X: 14 .. 54   Z: 5 .. 40   (40×35)                                     │
+  // └──────────────────────────────────────────────────────────────────────────┘
+  classroom103: {
+    id: 'classroom103',
+    name: 'Classroom 103',
+    bounds: { minX: 14, maxX: 54, minZ: 5, maxZ: 40 },
+    walls: [
+      // North wall – gap X:0..10 aligned with hallway south door gap
+      { x: 24, z: 5, length: 30, isX: true }, // X:24→54
+      // South wall (full)
+      { x: 14, z: 40, length: 40, isX: true },
+      // West wall (full)
+      { x: 14, z:  5, length: 35, isX: false },
+      // East wall (full)
+      { x: 54, z:  5, length: 35, isX: false },
+    ],
+    obstacles: [
+      // Teacher desk + whiteboard (south wall, flipped room)
+      { id: '103td', x: 34, y: 0.75, z: 36,   w: 4.0, h: 0.75, d: 1.6,  type: 'desk'  },
+      { id: '103tc', x: 34, y: 0.45, z: 34.5, w: 0.5, h: 0.45, d: 0.5,  type: 'chair' },
+      { id: '103wb', x: 34, y: 2.5,  z: 39.9, w: 12,  h: 2.2,  d: 0.08, type: 'board' },
+      // Student desks – 3 cols × 3 rows
+      ...studentDesks(20, 48, 10, 3, 3, 0, 4.0),
+      // Lockers – east wall
+      { id: '103lk0', x: 53.1, y: 1.8, z: 14, w: 0.2, h: 1.8, d: 0.7, type: 'locker' },
+      { id: '103lk1', x: 53.1, y: 1.8, z: 18, w: 0.2, h: 1.8, d: 0.7, type: 'locker' },
+      // Debris
+      { id: '103db0', x: 18, y: 0.2,  z: 37, w: 1.0, h: 0.2,  d: 0.7, type: 'debris' },
+      { id: '103db1', x: 50, y: 0.15, z: 10, w: 0.6, h: 0.15, d: 1.0, type: 'debris' },
+    ],
+    doors: [
+      {
+        id: 'door-103-hall',
+        x: 5, z: 5,
+        rotationY: Math.PI / 2, // faces north back into hallway
+        price: 1250,
+        target: 'hallway',
+        width: 4.0,
+      },
+    ],
+    spawns: [
+      { x: 18, z:  8, weight: 2 },
+      { x: 50, z:  8, weight: 2 },
+      { x: 50, z: 37, weight: 2 },
+      { x: 18, z: 37, weight: 2 },
+      { x: 34, z: 22, weight: 1 },
     ],
   },
 };
@@ -227,13 +288,9 @@ export const ROOMS: Record<string, Room> = {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function studentDesks(
-  startX: number,
-  endX: number,
-  startZ: number,
-  cols: number,
-  rows: number,
-  _xSpacing: number,
-  zSpacing: number
+  startX: number, endX: number, startZ: number,
+  cols: number, rows: number,
+  _xSpacing: number, zSpacing: number
 ): ObstacleDef[] {
   const out: ObstacleDef[] = [];
   const xStep = (endX - startX) / Math.max(cols - 1, 1);
