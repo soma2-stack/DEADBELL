@@ -2,10 +2,10 @@ import { generateWornWallTexture, generateConcreteFloorTexture, generateCeilingT
 import { buildStaticMap } from './mapBuilder';
 import { buildClassroomA, buildClassroomB } from './rooms';
 import { spawnSingleZombie as spawnZombieHelper } from '../entities/zombies';
-import { buildPistolGroup, buildShotgunGroup, buildTomeOfPowerMachine, buildFastHandsMachine, tickReloadAnimation, ReloadAnimState, PerkMachine } from '../weapons/models';
+import { buildPistolGroup, buildShotgunGroup, buildTomeOfPowerMachine, buildFastHandsMachine, tickReloadAnimation, ReloadAnimState, PerkMachine, WeaponDeps } from '../weapons/models';
 import { addShotgunWallbuy as _addShotgunWallbuy, buildBuyableDoor as _buildBuyableDoor } from '../map/interactables';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { sound } from '../sound';
@@ -177,13 +177,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     containerRef.current.appendChild(renderer.domElement);
 
     // --- GLB MODELS ---
-    const loaded3DModels = {
-      zombie:  null as THREE.Group | null,
-      pistol:  null as THREE.Group | null,
-      shotgun: null as THREE.Group | null,
+    const loaded3DModels: WeaponDeps['loaded3DModels'] = {
+      pistol:  null,
+      shotgun: null,
     };
     const modelLoader = new GLTFLoader();
-    modelLoader.load('/models/zombie.glb',  (g) => { g.scene.traverse(c => { if (c instanceof THREE.Mesh) { c.castShadow = true; c.receiveShadow = true; } }); loaded3DModels.zombie  = g.scene; }, undefined, () => {});
+    modelLoader.load('/models/zombie.glb',  (g) => { g.scene.traverse(c => { if (c instanceof THREE.Mesh) { c.castShadow = true; c.receiveShadow = true; } }); (loaded3DModels as any).zombie = g.scene; }, undefined, () => {});
     modelLoader.load('/models/pistol.glb',  (g) => { loaded3DModels.pistol  = g.scene; if (stateRef.current.activeWeaponId === 'pistol')  updateActiveGunModel('pistol');  }, undefined, () => {});
     modelLoader.load('/models/shotgun.glb', (g) => { loaded3DModels.shotgun = g.scene; if (stateRef.current.activeWeaponId === 'shotgun') updateActiveGunModel('shotgun'); }, undefined, () => {});
 
@@ -202,6 +201,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     const chalkboardMaterial = new THREE.MeshStandardMaterial({ color: 0x112d1b, roughness: 0.90 });
     const emissionGreen      = new THREE.MeshBasicMaterial({ color: 0x22c55e });
     const bloodSplashMat     = new THREE.MeshBasicMaterial({ color: 0x991b1b, transparent: true, opacity: 0.85 });
+
+    // Weapon deps object for model builders
+    const skinMaterial      = new THREE.MeshStandardMaterial({ color: 0xcca483, roughness: 0.85 });
+    const sleeveMaterial    = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.75 });
+    const watchStrapsMat    = new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.8 });
+    const watchBezelMat     = new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.2, metalness: 0.9 });
+    const watchGlassMat     = new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.05, transparent: true, opacity: 0.6 });
+    const weaponDeps: WeaponDeps = { skinMaterial, sleeveMaterial, watchStrapsMat, watchBezelMat, watchGlassMat, woodTex, loaded3DModels };
 
     // --- CONSTANTS ---
     const CLASSROOM_W      = 28;
@@ -331,13 +338,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       const g = new THREE.Group();
       const shirtMat  = new THREE.MeshStandardMaterial({ color: clothesColor, roughness: 0.75 });
       const jeansMat  = new THREE.MeshStandardMaterial({ color: 0x1d2c3d, roughness: 0.8 });
-      const skinMat   = new THREE.MeshStandardMaterial({ color: 0xcca483, roughness: 0.85 });
       const hairMat   = new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.95 });
       const torso = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.75, 0.32), shirtMat); torso.position.y = 1.05; torso.castShadow = true; g.add(torso);
-      const head  = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.32, 0.32), skinMat);  head.position.y  = 1.55; head.castShadow  = true; g.add(head);
+      const head  = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.32, 0.32), skinMaterial);  head.position.y  = 1.55; head.castShadow  = true; g.add(head);
       const hair  = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.10, 0.34), hairMat);  hair.position.set(0, 1.7, 0.02); g.add(hair);
-      const armL  = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.62, 0.13), skinMat);  armL.position.set(-0.35, 1.1, 0.05); armL.castShadow = true; g.add(armL);
-      const armR  = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.62, 0.13), skinMat);  armR.position.set(0.35, 1.1, 0.15); armR.rotation.x = -Math.PI/3; armR.castShadow = true; g.add(armR);
+      const armL  = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.62, 0.13), skinMaterial);  armL.position.set(-0.35, 1.1, 0.05); armL.castShadow = true; g.add(armL);
+      const armR  = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.62, 0.13), skinMaterial);  armR.position.set(0.35, 1.1, 0.15); armR.rotation.x = -Math.PI/3; armR.castShadow = true; g.add(armR);
       const legs  = new THREE.Mesh(new THREE.BoxGeometry(0.50, 0.65, 0.26), jeansMat); legs.position.y  = 0.355; legs.castShadow = true; g.add(legs);
       const gunMat = new THREE.MeshStandardMaterial({ color: 0x242424, roughness: 0.5 });
       const gunBox = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, 0.32), gunMat); gunBox.position.set(0.35, 1.1, 0.45); gunBox.rotation.x = -Math.PI/18; g.add(gunBox);
@@ -354,7 +360,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     scene.add(zombieGroup);
 
     const spawnSingleZombie = (spawnerIdx: number) => {
-      spawnZombieHelper(spawnerIdx, groundSpawners, zombieGroup, activeZombiesList, camera.position, stateRef.current.currentRound, loaded3DModels.zombie);
+      spawnZombieHelper(spawnerIdx, groundSpawners, zombieGroup, activeZombiesList, camera.position, stateRef.current.currentRound, (loaded3DModels as any).zombie ?? null);
     };
 
     let roundTransitionActive = false;
@@ -412,12 +418,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     };
 
     // --- PLAYER ---
-    const pVelocity  = new THREE.Vector3();
     const pDirection = new THREE.Vector3();
     camera.position.set(0, 1.65, 2.5);
     let lastInteractionPulse = 0;
     let lastDamageTime       = 0;
-    let playerReviveTimer    = 0;
     let pYaw   = 0;
     let pPitch = 0;
     const recoilOffset    = { x: 0, y: 0 };
@@ -429,7 +433,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       if (stateRef.current.gameState === 'playing') {
         try {
           const p = containerRef.current?.requestPointerLock();
-          if (p && typeof p.catch === 'function') p.catch((err: unknown) => { console.warn('Pointer lock deferred:', err); });
+          if (p && typeof (p as any).catch === 'function') (p as any).catch((err: unknown) => { console.warn('Pointer lock deferred:', err); });
         } catch (err) { console.warn('Pointer lock error:', err); }
       }
     };
@@ -467,7 +471,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       if (stateRef.current.ammoClip <= 0) { sound.playReloadClick(0.3); return; }
 
       const id = stateRef.current.activeWeaponId;
-      setAmmoClip(prev => {
+      setAmmoClip((prev: number) => {
         const next = Math.max(0, prev - 1);
         stateRef.current.ammoClip = next;
         weaponAmmoRef.current[id].clip = next;
@@ -543,8 +547,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
               triggerBloodExplosion(hitZombie.mesh.position.clone());
               setTimeout(() => { zombieGroup.remove(hitZombie!.mesh); const idx = activeZombiesList.indexOf(hitZombie!); if (idx > -1) activeZombiesList.splice(idx, 1); }, 800);
               const reward = hitZombie.scoreReward + (isHeadshot ? 50 : 0);
-              setPoints(p => p + reward); stateRef.current.points += reward;
-              setKills(k => k + 1);       stateRef.current.kills  += 1;
+              setPoints((p: number) => p + reward); stateRef.current.points += reward;
+              setKills((k: number) => k + 1);       stateRef.current.kills  += 1;
               addScorePopup(reward, isHeadshot ? '💀 HEADSHOT' : 'KILL');
               setHitmarker('kill');
               createFloatingDamageNumber(hitZombie.mesh.position.clone(), isHeadshot ? `💀 ${dmg}` : `${dmg}`, isHeadshot ? 'headshot-kill' : 'kill');
@@ -553,7 +557,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 socket.send(JSON.stringify({ type: 'zombie-killed', zombieId: hitZombie.id }));
               if (roundKillsRemaining <= 0 && zombiesLeftToSpawn <= 0) {
                 setTimeout(() => {
-                  setCurrentRound(r => { const nr = r + 1; stateRef.current.currentRound = nr; return nr; });
+                  setCurrentRound((r: number) => { const nr = r + 1; stateRef.current.currentRound = nr; return nr; });
                   startNextRoundWave();
                 }, 2500);
               }
@@ -574,10 +578,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     const updateActiveGunModel = (weapId: string) => {
       if (activeGunGroup) camera.remove(activeGunGroup);
       if (weapId === 'pistol') {
-        if (!pistolGroup) { pistolGroup = buildPistolGroup(blackMetalMaterial, woodMaterial); }
+        if (!pistolGroup) { pistolGroup = buildPistolGroup(weaponDeps); }
         activeGunGroup = pistolGroup;
       } else {
-        if (!shotgunGroup) { shotgunGroup = buildShotgunGroup(blackMetalMaterial, woodMaterial); }
+        if (!shotgunGroup) { shotgunGroup = buildShotgunGroup(weaponDeps); }
         activeGunGroup = shotgunGroup;
       }
       if (activeGunGroup) camera.add(activeGunGroup);
@@ -601,7 +605,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     };
 
     // --- RELOAD ---
-    let reloadAnimState: ReloadAnimState = { active: false, timer: 0, duration: 1.5 };
+    let reloadAnimState: ReloadAnimState = { active: false, time: 0, duration: 1.5, weaponId: 'pistol' };
 
     const triggerWeaponReload = () => {
       if (stateRef.current.isReloading) return;
@@ -609,10 +613,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       const ammo = weaponAmmoRef.current[id];
       if (ammo.clip >= ammo.maxClip || ammo.reserve <= 0) return;
       const reloadDuration = id === 'shotgun' ? (stateRef.current.hasFastHands ? 2.0 : 3.2) : (stateRef.current.hasFastHands ? 0.9 : 1.5);
-      reloadAnimState = { active: true, timer: 0, duration: reloadDuration };
+      reloadAnimState = { active: true, time: 0, duration: reloadDuration, weaponId: id };
       setIsReloading(true);
       stateRef.current.isReloading = true;
-      sound.playReload();
+      sound.playReloadClick(1.0);
       setTimeout(() => {
         const needed = ammo.maxClip - ammo.clip;
         const give   = Math.min(needed, ammo.reserve);
@@ -637,11 +641,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       // Wall buy
       if (!shotgunWallBuy.purchased) {
-        const dist = playerPos.distanceTo(new THREE.Vector3(...shotgunWallBuy.position));
+        const wbp = shotgunWallBuy.position;
+        const dist = playerPos.distanceTo(new THREE.Vector3(wbp[0], wbp[1], wbp[2]));
         if (dist < 2.2) {
           if (stateRef.current.points >= shotgunWallBuy.price) {
             shotgunWallBuy.purchased = true;
-            setPoints(p => p - shotgunWallBuy.price); stateRef.current.points -= shotgunWallBuy.price;
+            setPoints((p: number) => p - shotgunWallBuy.price); stateRef.current.points -= shotgunWallBuy.price;
             weaponsOwnedRef.current.push('shotgun');
             weaponAmmoRef.current.shotgun = { clip: 6, reserve: 24, maxClip: 6, maxReserve: 48 };
             addScorePopup(-shotgunWallBuy.price, 'Shotgun Bought!');
@@ -655,11 +660,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       // Buyable door
       if (!classroomExitDoor.purchased) {
-        const doorPos = new THREE.Vector3(...classroomExitDoor.position);
+        const dp = classroomExitDoor.position;
+        const doorPos = new THREE.Vector3(dp[0], dp[1], dp[2]);
         if (playerPos.distanceTo(doorPos) < 2.8) {
           if (stateRef.current.points >= classroomExitDoor.price) {
             classroomExitDoor.purchased = true;
-            setPoints(p => p - classroomExitDoor.price); stateRef.current.points -= classroomExitDoor.price;
+            setPoints((p: number) => p - classroomExitDoor.price); stateRef.current.points -= classroomExitDoor.price;
             addScorePopup(-classroomExitDoor.price, 'Door Opened!');
             scene.remove(classroomExitDoor.group);
             doorBlockerBox = new THREE.Box3();
@@ -672,18 +678,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       // Perk machines
       for (const perk of perkMachines) {
-        const pDist = playerPos.distanceTo(perk.position);
+        const pDist = playerPos.distanceTo(perk.position instanceof THREE.Vector3 ? perk.position : new THREE.Vector3(perk.position[0], perk.position[1], perk.position[2]));
         if (pDist < 2.0) {
           if (perk.id === 'tome-of-power' && !stateRef.current.hasTomeOfPower) {
             if (stateRef.current.points >= perk.price) {
               stateRef.current.hasTomeOfPower = true;
-              setPoints(p => p - perk.price); stateRef.current.points -= perk.price;
+              setPoints((p: number) => p - perk.price); stateRef.current.points -= perk.price;
               addScorePopup(-perk.price, '🔮 Tome of Power!');
             } else { addScorePopup(0, 'Need ' + perk.price + ' pts!'); }
           } else if (perk.id === 'fast-hands' && !stateRef.current.hasFastHands) {
             if (stateRef.current.points >= perk.price) {
               stateRef.current.hasFastHands = true;
-              setPoints(p => p - perk.price); stateRef.current.points -= perk.price;
+              setPoints((p: number) => p - perk.price); stateRef.current.points -= perk.price;
               addScorePopup(-perk.price, '⚡ Fast Hands!');
             } else { addScorePopup(0, 'Need ' + perk.price + ' pts!'); }
           }
@@ -695,16 +701,20 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     // --- INTERACT PROMPT ---
     const updateInteractMessage = () => {
       const playerPos = camera.position;
-      if (!shotgunWallBuy.purchased && playerPos.distanceTo(new THREE.Vector3(...shotgunWallBuy.position)) < 2.2) {
+      const wbp = shotgunWallBuy.position;
+      if (!shotgunWallBuy.purchased && playerPos.distanceTo(new THREE.Vector3(wbp[0], wbp[1], wbp[2])) < 2.2) {
         setInteractMessage(`[E] Buy Shotgun - ${shotgunWallBuy.price} pts`); return;
       }
-      if (!classroomExitDoor.purchased && playerPos.distanceTo(new THREE.Vector3(...classroomExitDoor.position)) < 2.8) {
+      const dp = classroomExitDoor.position;
+      if (!classroomExitDoor.purchased && playerPos.distanceTo(new THREE.Vector3(dp[0], dp[1], dp[2])) < 2.8) {
         setInteractMessage(`[E] Open Door - ${classroomExitDoor.price} pts`); return;
       }
       for (const perk of perkMachines) {
-        if (playerPos.distanceTo(perk.position) < 2.0) {
+        const pp = perk.position;
+        const pv = pp instanceof THREE.Vector3 ? pp : new THREE.Vector3(pp[0], pp[1], pp[2]);
+        if (playerPos.distanceTo(pv) < 2.0) {
           const owned = perk.id === 'tome-of-power' ? stateRef.current.hasTomeOfPower : stateRef.current.hasFastHands;
-          if (!owned) { setInteractMessage(`[E] Buy ${perk.label} - ${perk.price} pts`); return; }
+          if (!owned) { setInteractMessage(`[E] Buy ${perk.name} - ${perk.price} pts`); return; }
         }
       }
       setInteractMessage(null);
@@ -775,8 +785,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           zombie.state = 'chasing';
           zombie.mesh.position.addScaledVector(toPlayer, zombie.speed * delta);
           zombie.mesh.lookAt(camera.position.x, zombie.mesh.position.y, camera.position.z);
-          zombie.mesh.position.y = 0;
-          // Bob animation
           zombie.mesh.position.y = Math.abs(Math.sin(zombie.animTime * 6)) * 0.06;
         } else {
           zombie.state = 'attacking';
@@ -831,7 +839,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         if (!blocked && (inClassroom || inHallway)) {
           camera.position.copy(nextPos);
         } else if (!blocked) {
-          // allow movement inside extra rooms (no hard wall there)
           camera.position.copy(nextPos);
         }
         camera.position.y = 1.65;
@@ -856,7 +863,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           -0.11 + adsLerp * 0.06,
           -0.38 + gunRecoilZOffset
         );
-        tickReloadAnimation(activeGunGroup, reloadAnimState, delta);
+        tickReloadAnimation(reloadAnimState, activeGunGroup, delta);
       }
 
       // Fire cooldown
