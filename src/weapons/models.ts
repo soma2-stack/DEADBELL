@@ -1,5 +1,10 @@
 import * as THREE from 'three';
 
+// Classroom dimensions (must match GameCanvas.tsx)
+// ⚠️ MUST be declared before the perk machine builders that reference them
+const CLASSROOM_W_HALF = 14;
+const CLASSROOM_D_HALF = 12;
+
 export interface WeaponDeps {
   skinMaterial: THREE.Material;
   watchStrapsMat: THREE.Material;
@@ -377,7 +382,7 @@ export const buildShotgunGroup = (deps: WeaponDeps): THREE.Group => {
   breachGroup.add(bead);
 
   // Shell tubes visible at breach (before close)
-  for (const [y, label] of [[-0.118, 'top'], [-0.142, 'bot']] as [number,string][]) {
+  for (const [y] of [[-0.118], [-0.142]] as [number][]) {
     const shellBody = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.048, 10), redShellMat);
     shellBody.rotation.x = Math.PI / 2; shellBody.position.set(0.12, y, -0.24);
     breachGroup.add(shellBody);
@@ -704,7 +709,3 @@ export const buildFastHandsMachine = (scene: THREE.Scene): PerkMachine => {
 
   return { id: 'fast-hands', name: 'Fast Hands', price: 2000, position: [px, 0.9, pz], group: g, purchased: false, glowLight: glow };
 };
-
-// Classroom dimensions (must match GameCanvas.tsx)
-const CLASSROOM_W_HALF = 14;
-const CLASSROOM_D_HALF = 12;
