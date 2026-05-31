@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { GameCanvas } from './components/GameCanvas';
 import { HUD } from './components/HUD';
-import { TeammateState } from './types';
+import { TeammateState, WeaponId } from './types';
 
 export default function App() {
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'gameover' | 'paused' | 'loading'>('menu');
@@ -57,8 +57,8 @@ export default function App() {
     setKills(0);
     setCurrentRound(1);
     setActiveWeaponId('pistol');
-    setAmmoClip(12);
-    setAmmoReserve(60);
+    setAmmoClip(8);
+    setAmmoReserve(64);
     setHasFastHands(false);
     setIsADS(false);
     setIsReloading(false);
@@ -173,9 +173,10 @@ export default function App() {
     }
   }, [socket]);
 
-  const [activeWeaponId, setActiveWeaponId] = useState<'pistol' | 'shotgun' | 'smg' | 'm16' | 'magnum' | 'sniper' | 'wonder_weapon'>('pistol');
-  const [ammoClip, setAmmoClip] = useState(12);
-  const [ammoReserve, setAmmoReserve] = useState(60);
+  // WeaponId is imported from types.ts — always stays in sync with WEAPON_DEFINITIONS
+  const [activeWeaponId, setActiveWeaponId] = useState<WeaponId>('pistol');
+  const [ammoClip, setAmmoClip] = useState(8);
+  const [ammoReserve, setAmmoReserve] = useState(64);
   const [hasFastHands, setHasFastHands] = useState(false);
   
   const [isADS, setIsADS] = useState(false);
