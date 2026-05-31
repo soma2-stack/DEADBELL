@@ -315,21 +315,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       []
     );
 
-    // --- BUILD SIDE CLASSROOMS (Science Lab north, Abandoned Classroom south) ---
-    const roomDeps = {
-      scene,
-      wallMaterial,
-      floorMaterial,
-      ceilingMaterial,
-      woodMaterial,
-      blackMetalMaterial,
-      chalkboardMaterial,
-      woodTex,
-      obstacles: classroomObstacles,
-    };
-    const classroomAResult = buildClassroomA(roomDeps);
-    const classroomBResult = buildClassroomB(roomDeps);
-
     // --- PERK MACHINES ---
     const tomePerk: PerkMachine = buildTomeOfPowerMachine(scene);
     const fastHandsPerk: PerkMachine = buildFastHandsMachine(scene);
@@ -349,9 +334,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       { x: -6.0, z: 1.0, label: 'Classroom West Side' },
       { x: 6.0, z: -1.0, label: 'Classroom East Side' },
       { x: 19.0, z: -12.0, label: 'Hallway North' },
-      { x: 19.0, z: 12.0, label: 'Hallway South' },
-      { x: 18.0, z: -37.0, label: 'Science Lab' },
-      { x: 18.0, z: 37.0,  label: 'Abandoned Classroom' },
+      { x: 19.0, z: 12.0, label: 'Hallway South' }
     ];
 
     const triggerGravelEruption = (pos: THREE.Vector3) => {
