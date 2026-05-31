@@ -63,6 +63,8 @@ interface GameCanvasProps {
   roomId?: string;
   roomState?: any;
   clientId?: string;
+  hasFastHands: boolean;
+  setHasFastHands: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export const GameCanvas: React.FC<GameCanvasProps> = ({
@@ -78,7 +80,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   isReloading, setIsReloading,
   setHitmarker, setInteractMessage, addScorePopup, setShowWaveBanner,
   isCoop, setTeammates, setPlayerReviveProgress, setTeammateReviveProgress, setRevivingName,
-  socket, roomId, roomState, clientId
+  socket, roomId, roomState, clientId,
+  hasFastHands, setHasFastHands,
 }) => {
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -175,6 +178,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     renderer.toneMappingExposure = 1.15;
     containerRef.current.innerHTML = '';
     containerRef.current.appendChild(renderer.domElement);
+
+    // Give the canvas container the id App.tsx listens to for pointerlockchange
+    containerRef.current.id = 'fps-canvas-container';
 
     // --- GLB MODELS ---
     const loaded3DModels: WeaponDeps['loaded3DModels'] = {
@@ -432,14 +438,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     const handlePointerLock = () => {
       if (stateRef.current.gameState === 'playing') {
         try {
-          const p = containerRef.current?.requestPointerLock();
+          const el = document.getElementById('fps-canvas-container');
+          const p = el?.requestPointerLock();
           if (p && typeof (p as any).catch === 'function') (p as any).catch((err: unknown) => { console.warn('Pointer lock deferred:', err); });
         } catch (err) { console.warn('Pointer lock error:', err); }
       }
     };
 
     const onMouseMove = (e: MouseEvent) => {
-      if (document.pointerLockElement !== containerRef.current) return;
+      if (document.pointerLockElement !== document.getElementById('fps-canvas-container')) return;
       if (stateRef.current.gameState !== 'playing') return;
       const sensMult = stateRef.current.isADS ? 0.45 : 1.0;
       pYaw   -= e.movementX * stateRef.current.mouseSensitivity * sensMult;
@@ -459,7 +466,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     let fireCooldownLeft = 0;
 
     const onMouseDown = (e: MouseEvent) => {
-      if (document.pointerLockElement !== containerRef.current) return;
+      if (document.pointerLockElement !== document.getElementById('fps-canvas-container')) return;
       if (stateRef.current.gameState !== 'playing') return;
       if (e.button === 0) triggerShootWeapon();
       if (e.button === 2) setIsADS(true);
@@ -689,6 +696,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           } else if (perk.id === 'fast-hands' && !stateRef.current.hasFastHands) {
             if (stateRef.current.points >= perk.price) {
               stateRef.current.hasFastHands = true;
+              setHasFastHands(true);
               setPoints((p: number) => p - perk.price); stateRef.current.points -= perk.price;
               addScorePopup(-perk.price, '⚡ Fast Hands!');
             } else { addScorePopup(0, 'Need ' + perk.price + ' pts!'); }
